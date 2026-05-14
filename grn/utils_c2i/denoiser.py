@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 from grn.models.grn_c2i import GRN_models
@@ -38,6 +39,8 @@ class Denoiser(nn.Module):
         self.cfg_scale = args.cfg
         self.cfg_interval = (args.interval_min, args.interval_max)
         self.args = args
+        self.total_steps = []
+        self.entropy_list = []
 
     def drop_labels(self, labels):
         drop = torch.rand(labels.shape[0], device=labels.device) < self.label_drop_prob
@@ -97,11 +100,45 @@ class Denoiser(nn.Module):
         timesteps = torch.linspace(0.0, 1.0, self.steps+1, device=device).view(-1, *([1] * z.ndim)).expand(-1, bsz, -1, -1, -1)
 
         for i in range(self.steps): # self.steps=50
-            t = timesteps[i] # len(timesteps)=51
-            t_next = timesteps[i + 1]
-
+            if self.method == 'cosine':
+                t = 1 - torch.cos(torch.pi / 2 * timesteps[i])
+                t_next = 1 - torch.cos(torch.pi / 2 * timesteps[i + 1])
+            elif self.method == 'complexity_aware':
+                if i == 0:
+                    t = torch.zeros((bsz, 1, 1, 1), device=device)
+                else:
+                    t = t_next
+            else:
+                t = timesteps[i] # len(timesteps)=51
+                t_next = timesteps[i + 1]
             # conditional
             x_cond = self.net(z, t.flatten(), labels)
+
+            cur_tau = self.args.tau * torch.ones((bsz, 1, 1, 1), device=device)
+            # cal entropy
+            if self.method == 'complexity_aware':
+                x_cond_probs = x_cond.softmax(dim=1)
+                B, classes, d, h, w = x_cond_probs.shape
+                cur_entropy = 1 / np.log2(classes) * torch.sum(-x_cond_probs * torch.log2(x_cond_probs), dim=1)
+                cur_entropy = cur_entropy.mean([1,2,3]).reshape(B, 1, 1, 1) # [B,1,1,1]
+                if i == self.args.complexity_aware_wp: # 5 by default
+                    decision_entropy = cur_entropy
+                    dynamic_steps = self.args.complexity_aware_k * decision_entropy + self.args.complexity_aware_b # [B,1,1,1]
+                    dynamic_steps = dynamic_steps.clip(min=self.args.complexity_aware_tmin-self.args.complexity_aware_wp, max=self.steps-self.args.complexity_aware_wp).round()
+                    total_dynamic_steps = (dynamic_steps + self.args.complexity_aware_wp).reshape(-1).tolist()
+                    self.total_steps.extend(total_dynamic_steps)
+                    self.entropy_list.append(decision_entropy.reshape(-1).tolist())
+                    print(f'Tmin={np.min(self.total_steps):.1f}, Tmax={np.max(self.total_steps):.1f}, Tmean={np.mean(self.total_steps):.1f}, Tmedian={np.median(self.total_steps):.1f}, Std={np.std(self.total_steps):.4f}')
+                    print(f'Emin={np.min(self.entropy_list):.3f}, Emax={np.max(self.entropy_list):.3f}, Emean={np.mean(self.entropy_list):.3f}, Emedian={np.median(self.entropy_list):.3f}, Std={np.std(self.entropy_list):.4f}')
+                
+                if i < self.args.complexity_aware_wp:
+                    t_next = (i + 1) / self.steps
+                    t_next = t_next * torch.ones((bsz, 1, 1, 1), device=device)
+                else:
+                    tau_factor = ((dynamic_steps - 10) / 40 + 0.5).clip(min=0.5, max=1.0)
+                    cur_tau = self.args.tau * tau_factor
+                    t_next = (self.args.complexity_aware_wp / self.steps) + (1 - self.args.complexity_aware_wp / self.steps) / dynamic_steps * (i + 1 - self.args.complexity_aware_wp)
+                not_finished_flag = (t < 0.99)
 
             # unconditional
             x_uncond = self.net(z, t.flatten(), torch.full_like(labels, self.num_classes))
@@ -115,13 +152,17 @@ class Denoiser(nn.Module):
                 interval_mask = (t < high) & ((low == 0) | (t > low))
                 cfg_scale_interval = torch.where(interval_mask, self.cfg_scale, 1.0)
                 x_pred = x_uncond + cfg_scale_interval.unsqueeze(1) * (x_cond - x_uncond)
-            x_pred = x_pred / self.args.tau
+            x_pred = x_pred / cur_tau.unsqueeze(1)
             x_pred = x_pred.softmax(dim=1)
             B, classes, d, h, w = x_pred.shape
             x_pred = x_pred.permute(0,2,3,4,1) # [B,d,h,w,classes]
             pred_labels = torch.multinomial(x_pred.reshape(-1, classes), num_samples=1, replacement=True, generator=None).reshape(B,d,h,w)
             use_pred_mask = torch.rand(size=pred_labels.shape, device=pred_labels.device) < t_next
-            z = torch.where(use_pred_mask, pred_labels, rand_labels)
+            if self.method == 'complexity_aware':
+                z = torch.where(not_finished_flag * use_pred_mask, pred_labels, z)
+                z = torch.where(not_finished_flag * (~use_pred_mask), rand_labels, z)
+            else:
+                z = torch.where(use_pred_mask, pred_labels, rand_labels)
         return z
 
 

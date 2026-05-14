@@ -107,9 +107,10 @@ def evaluate(model_without_ddp, args, epoch, batch_size=64, log_writer=None, vae
     save_folder = os.path.join(
         args.generation_dir,
         f'Epoch{epoch:04d}',
-        "{}-steps{}-cfg{}-tau{}-interval{}-{}-image{}-res{}".format(
+        "{}-steps{}-cfg{}-tau{}-interval{}-{}-image{}-res{}-wp{}-k{}-b{}-Tmin{}".format(
             model_without_ddp.method, model_without_ddp.steps, model_without_ddp.cfg_scale, args.tau,
-            model_without_ddp.cfg_interval[0], model_without_ddp.cfg_interval[1], args.num_images, args.img_size
+            model_without_ddp.cfg_interval[0], model_without_ddp.cfg_interval[1], args.num_images, args.img_size,
+            args.complexity_aware_wp, args.complexity_aware_k, args.complexity_aware_b, args.complexity_aware_tmin,
         ),
         'images',
     )
@@ -120,9 +121,10 @@ def evaluate(model_without_ddp, args, epoch, batch_size=64, log_writer=None, vae
     json_file = os.path.join(
         os.path.dirname(os.environ.get('CKPT_FILE', '/tmp/res')),
         f'testing/Epoch{epoch:04d}/images_{args.num_images}',
-        "{}-steps{}-cfg{}-tau{}-interval{}-{}-image{}-res{}".format(
+        "{}-steps{}-cfg{}-tau{}-interval{}-{}-image{}-res{}-wp{}-k{}-b{}-Tmin{}".format(
             model_without_ddp.method, model_without_ddp.steps, model_without_ddp.cfg_scale, args.tau,
-            model_without_ddp.cfg_interval[0], model_without_ddp.cfg_interval[1], args.num_images, args.img_size
+            model_without_ddp.cfg_interval[0], model_without_ddp.cfg_interval[1], args.num_images, args.img_size,
+            args.complexity_aware_wp, args.complexity_aware_k, args.complexity_aware_b, args.complexity_aware_tmin,
         ),
         'metrics.json',
     )
@@ -221,8 +223,27 @@ def evaluate(model_without_ddp, args, epoch, batch_size=64, log_writer=None, vae
             )
         print("FID: {:.4f}, Inception Score: {:.4f}".format(fid, inception_score))
         os.makedirs(os.path.dirname(json_file), exist_ok=True)
+        if args.sampling_method == 'complexity_aware':
+            total_steps = model_without_ddp.total_steps
+            entropy_list = model_without_ddp.entropy_list
+            metrics_dict.update({
+                'T_mean': np.mean(total_steps),
+                'T_median': np.median(total_steps),
+                'T_std': np.std(total_steps),
+                'T_min': np.min(total_steps),
+                'T_max': np.max(total_steps),
+                'T_num': len(total_steps),
+                'E_mean': np.mean(entropy_list),
+                'E_median': np.median(entropy_list),
+                'E_std': np.std(entropy_list),
+                'E_min': np.min(entropy_list),
+                'E_max': np.max(entropy_list),
+                'E_num': len(entropy_list),
+            })
+            metrics_dict['T_mean'] = np.mean(total_steps)
+            metrics_dict['entropy_list'] = entropy_list
         with open(json_file, 'w') as f:
-            json.dump(metrics_dict, f)
+            json.dump(metrics_dict, f, indent=2)
         if args.delete_images:
             shutil.rmtree(save_folder)
 

@@ -127,6 +127,7 @@ def get_args_parser():
     parser.add_argument('--dist_url', default='env://',
                         help='URL used to set up distributed training')
     parser.add_argument('--hbq_round', default=4, type=int,)
+    parser.add_argument('--vae_latent', default=16, type=int,)
     parser.add_argument('--in_channels', default=3, type=int,)
     parser.add_argument('--method', default='GRN_ind', type=str, choices=['GRN_ind', 'GRN_bit'])
     parser.add_argument('--vae_path', default='', type=str,)
@@ -136,7 +137,10 @@ def get_args_parser():
     parser.add_argument('--clip_grad_norm', default=1., type=float)
     parser.add_argument('--use_fsdp_train', default=0, type=int, choices=[0, 1])
     parser.add_argument('--delete_images', default=1, type=int, choices=[0, 1])
-    parser.add_argument('--use_confidence_sampling', default=0, type=int, choices=[0, 1])
+    parser.add_argument('--complexity_aware_wp', default=5, type=int)
+    parser.add_argument('--complexity_aware_k', default=1, type=float)
+    parser.add_argument('--complexity_aware_b', default=0, type=float)
+    parser.add_argument('--complexity_aware_tmin', default=20, type=float)
     parser.add_argument('--inner_shard_degree', default=8, type=int)
     parser.add_argument('--patch_size', default=1, type=int)
     parser.add_argument('--convert_type', default='', type=str)
@@ -205,7 +209,7 @@ def main(args):
 
     # ininitalize vae
     from grn.models.hbq_tokenizer import HBQ_Tokenizer
-    vae = HBQ_Tokenizer(args=args, latent_channels=16, encoder_out_type='feature_tanh')
+    vae = HBQ_Tokenizer(args=args, latent_channels=args.vae_latent, encoder_out_type='feature_tanh')
     vae.eval()
     vae = vae.to('cuda')
     for param in vae.parameters():
