@@ -554,7 +554,6 @@ class GRN(nn.Module):
         if cfg_list is None: cfg_list = []
         if tau_list is None: tau_list = []
         
-        print(f"Inference token IDs - class: {class_token_id}, uncond: {uncond_class_token_id}")
         from grn.schedules.global_refine import shift_pt
         
         rng = None
@@ -656,18 +655,11 @@ class GRN(nn.Module):
             categories = pred_cond_logits.shape[-1]
             entrophy = (-pred_cond_probs * torch.log2(pred_cond_probs)).sum(-1).mean().item() / np.log2(categories)
 
-            decision_steps = 5
-            if cur_inner_round_si == decision_steps:
-                decision_entrophy = entrophy
-            
-            k = 417.7052426732362
-            b = -318.1272488653967
-            if cur_inner_round_si < decision_steps:
-                pt_unshift = (cur_inner_round_si + 1) / 50
-            else:
-                pt_unshift = decision_steps / 50 + (1 - decision_steps / 50) * (cur_inner_round_si + 1 - decision_steps) / np.clip(np.round(k * decision_entrophy + b), a_min=min_infer_steps-decision_steps, a_max=max_infer_steps-decision_steps)
+            pt_unshift = (cur_inner_round_si + 1) / (args.complexity_aware_Tmax - 1)
+            pt_shift = shift_pt(min(1., pt_unshift), args.snr_shift)
+            next_pt = 1 - np.cos(np.pi/2*pt_shift)
+            next_pt = next_pt * 0.999
 
-            next_pt = shift_pt(min(1., pt_unshift), args.alpha)
             pred_cond_labels = torch.argmax(pred_cond_probs, dim=-1) # [B,thw,d]
             pred_cond_labels = bld_to_bthwd(pred_cond_labels, pt, ph, pw)
             pred_uncond_logits = logits[:,(mul_pt_ph_pw+args.add_scale_token+args.add_class_token):(2*mul_pt_ph_pw+args.add_scale_token+args.add_class_token)] # [B,thw,d,2]

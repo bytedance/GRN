@@ -38,7 +38,7 @@ def encode_prompt(t5_path, text_tokenizer, text_encoder, prompt, enable_positive
     cu_seqlens_k = torch.tensor(cu_seqlens_k, dtype=torch.int32)
     Ltext = max(lens)
     kv_compact = torch.cat(text_features, dim=0).float()
-    kv_compact = kv_compact.to('cuda')
+    kv_compact = kv_compact.to(args.other_device)
     text_cond_tuple = (kv_compact, lens, cu_seqlens_k, Ltext)
     return text_cond_tuple
 
@@ -122,12 +122,14 @@ def gen_one_example(
 def get_prompt_id(prompt):
     return hash_string(prompt)
 
-def load_tokenizer(t5_path =''):
+def load_tokenizer(t5_path ='', device='cuda'):
     print(f'[Loading tokenizer and text encoder]')
+    if isinstance(device, str):
+        device = torch.device(device)
     text_encoder = T5EncoderModel(
         text_len=512,
         dtype=torch.bfloat16,
-        device='cuda',
+        device=device,
         checkpoint_path=osp.join(t5_path, 'models_t5_umt5-xxl-enc-bf16.pth'),
         tokenizer_path=osp.join(t5_path, 'umt5-xxl'),
         enable_fsdp=False)
@@ -178,7 +180,7 @@ def joint_vi_vae_encode_decode(vae, image_path, scale_schedule, device, tgt_h, t
 
 
 def load_transformer(vae, args):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device(args.other_device)
     model_path = args.model_path
     if not model_path:
         state_dict = None
@@ -189,38 +191,62 @@ def load_transformer(vae, args):
         state_dict = torch.load(slim_model_path, map_location=device)
 
     print(f'[Loading Model]')
-    with torch.cuda.amp.autocast(enabled=True, dtype=torch.bfloat16, cache_enabled=True), torch.no_grad():
-        model = create_model(
-            args.model,
-            vae_local=vae, text_channels=args.text_channels, text_maxlen=512,
-            shared_aln=True, raw_scale_schedule=None,
-            checkpointing='full-block',
-            customized_flash_attn=False,
-            fused_norm=True,
-            pad_to_multiplier=128,
-            use_flex_attn=False,
-            num_of_label_value=args.num_of_label_value,
-            rope2d_normalized_by_hw=args.rope2d_normalized_by_hw,
-            pn=args.pn,
-            apply_spatial_patchify=args.apply_spatial_patchify,
-            inference_mode=True,
-            train_h_div_w_list=args.train_h_div_w_list,
-            dynamic_scale_schedule=args.dynamic_scale_schedule,
-            video_frames=args.video_frames,
-            other_args=args,
-        ).to(device=device)
-        print(f'[you selected model with {args.model}] model size: {sum(p.numel() for p in model.parameters())/1e9:.2f}B, bf16={args.bf16}')
-        if args.bf16:
-            for block in model.unregistered_blocks:
-                block.bfloat16()
-        model.eval()
-        model.requires_grad_(False)
+    # Check if device is CUDA before enabling autocast
+    if device.type == 'cuda':
+        with torch.cuda.amp.autocast(enabled=True, dtype=torch.bfloat16, cache_enabled=True), torch.no_grad():
+            model = create_model(
+                args.model,
+                vae_local=vae, text_channels=args.text_channels, text_maxlen=512,
+                shared_aln=True, raw_scale_schedule=None,
+                checkpointing='full-block',
+                customized_flash_attn=False,
+                fused_norm=True,
+                pad_to_multiplier=128,
+                use_flex_attn=False,
+                num_of_label_value=args.num_of_label_value,
+                rope2d_normalized_by_hw=args.rope2d_normalized_by_hw,
+                pn=args.pn,
+                apply_spatial_patchify=args.apply_spatial_patchify,
+                inference_mode=True,
+                train_h_div_w_list=args.train_h_div_w_list,
+                dynamic_scale_schedule=args.dynamic_scale_schedule,
+                video_frames=args.video_frames,
+                other_args=args,
+            ).to(device=device)
+    else:
+        with torch.no_grad():
+            model = create_model(
+                args.model,
+                vae_local=vae, text_channels=args.text_channels, text_maxlen=512,
+                shared_aln=True, raw_scale_schedule=None,
+                checkpointing='full-block',
+                customized_flash_attn=False,
+                fused_norm=True,
+                pad_to_multiplier=128,
+                use_flex_attn=False,
+                num_of_label_value=args.num_of_label_value,
+                rope2d_normalized_by_hw=args.rope2d_normalized_by_hw,
+                pn=args.pn,
+                apply_spatial_patchify=args.apply_spatial_patchify,
+                inference_mode=True,
+                train_h_div_w_list=args.train_h_div_w_list,
+                dynamic_scale_schedule=args.dynamic_scale_schedule,
+                video_frames=args.video_frames,
+                other_args=args,
+            ).to(device=device)
+    print(f'[you selected model with {args.model}] model size: {sum(p.numel() for p in model.parameters())/1e9:.2f}B, bf16={args.bf16}')
+    if args.bf16:
+        for block in model.unregistered_blocks:
+            block.bfloat16()
+    model.eval()
+    model.requires_grad_(False)
+    # Only call cuda() if device is CUDA
+    if device.type == 'cuda':
         model.cuda()
         torch.cuda.empty_cache()
-        print(f'[Load model weights]')
-        if state_dict:
-            print(model.load_state_dict(state_dict, strict=True))
-        model.rng = torch.Generator(device=device)
+    print(f'[Load model weights]')
+    if state_dict:
+        print(model.load_state_dict(state_dict, strict=True))
     return model
 
 def images2video(ndarray_image_list, fps=24, save_filepath='tmp.mp4'):
@@ -242,4 +268,3 @@ def imgs_tensor2uint8_imgs(imgs_tensor):
     imgs_tensor = imgs_tensor.permute(1, 2, 3, 0) # [c,t,h,w] -> [t,h,w,c]
     imgs_tensor = ((imgs_tensor + 1) / 2).clamp(0, 1)
     return imgs_tensor.mul(255).to(torch.uint8).flip(dims=(3,)).cpu().numpy()
-    

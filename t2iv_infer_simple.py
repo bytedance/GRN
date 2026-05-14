@@ -4,10 +4,10 @@ from grn_pipeline import GRNPipeline
 
 # load pipeline
 pipeline = GRNPipeline.from_pretrained(hf_repo_id='bytedance-research/GRN', device='cpu')
-pipe = pipe.to('cuda')
+pipeline = pipeline.to('cuda')
 
 # generatie one image
-result = pipe(
+result = pipeline(
     prompt="A cute cat playing in the garden",
     guidance_scale=3.0,
     temperature=1.1,

@@ -13,6 +13,11 @@ from torch.nn.functional import scaled_dot_product_attention as slow_attn    # q
 from grn.models.rope import apply_rotary_emb
 from grn.utils_t2iv.sequence_parallel import sp_all_to_all, SequenceParallelManager as sp_manager
 
+try:
+    from flash_attn.cute import flash_attn_varlen_func
+except:
+    from flash_attn import flash_attn_varlen_func
+                
 # Import flash_attn's fused ops
 try:
     from flash_attn.ops.rms_norm import rms_norm as rms_norm_impl
@@ -202,20 +207,19 @@ class SelfAttention(nn.Module):
             attn_output = attn_fn(query_states.to(value_states.dtype), key_states.to(value_states.dtype), value_states, scale=scale).transpose(1, 2).reshape(B, L, C)
         else:
             if attn_bias_or_two_vector is None:
+
                 # fa2, flash_attn_func input/output should be (batch_size, seqlen, nheads, headdim)
-                # from flash_attn import flash_attn_func, flash_attn_varlen_func
-                from flash_attn.cute import flash_attn_varlen_func
                 attn_output = flash_attn_varlen_func(
-                    q = query_states.permute([0,2,1,3]).to(torch.bfloat16).squeeze(0),
-                    k = key_states.permute([0,2,1,3]).to(torch.bfloat16).squeeze(0),
-                    v = value_states.permute([0,2,1,3]).to(torch.bfloat16).squeeze(0),
+                    q = query_states.permute([0,2,1,3]).contiguous().to(torch.bfloat16).squeeze(0),
+                    k = key_states.permute([0,2,1,3]).contiguous().to(torch.bfloat16).squeeze(0),
+                    v = value_states.permute([0,2,1,3]).contiguous().to(torch.bfloat16).squeeze(0),
                     cu_seqlens_q = torch.tensor([0] + split_cond_uncond, device=query_states.device).cumsum(-1).to(torch.int32),
                     cu_seqlens_k = torch.tensor([0] + cu_seqlens_k, device=query_states.device).cumsum(-1).to(torch.int32),
                     max_seqlen_q = max(split_cond_uncond),
                     max_seqlen_k = max(cu_seqlens_k),
                     softmax_scale=scale,
                 )
-                attn_output = attn_output[0].reshape(B, L, C)
+                attn_output = attn_output.reshape(B, L, C).contiguous()
                 # attn_output = flash_attn_func(query_states.permute([0,2,1,3]).to(torch.bfloat16), key_states.permute([0,2,1,3]).to(torch.bfloat16), value_states.permute([0,2,1,3]).to(torch.bfloat16), softmax_scale=scale)
             else:
                 # slow attn

@@ -36,12 +36,18 @@ class GRNPipeline:
         device='cuda',
         torch_dtype=torch.bfloat16,
         hf_repo_id=None,
+        task='t2i',
     ):
         # download weights from Hugging Face Hub
         if hf_repo_id:
             from huggingface_hub import hf_hub_download, snapshot_download
             print(f"download weights from Hugging Face Hub: {hf_repo_id}")
-            model_path = hf_hub_download(repo_id=hf_repo_id, filename="t2i_model_tmp.pth")
+            if task == 't2i':
+                model_path = hf_hub_download(repo_id=hf_repo_id, filename="GRN_T2I_2B.pth")
+            elif task == 't2v':
+                model_path = hf_hub_download(repo_id=hf_repo_id, filename="GRN_T2V_2B.pth")
+            else:
+                raise ValueError(f"Unknown task: {task}")
             vae_path = hf_hub_download(repo_id=hf_repo_id, filename="HBQ_tokenizer_64dim_M4.ckpt")
             snapshot_path = snapshot_download(repo_id=hf_repo_id, allow_patterns="umt5-xxl/**")
             text_encoder_ckpt = os.path.join(snapshot_path, "umt5-xxl")
@@ -54,12 +60,10 @@ class GRNPipeline:
         if isinstance(device, str):
             device = torch.device(device)
         args.other_device = device
+        args.task = task
 
         # Derived parameters
         args.max_duration = (args.video_frames - 1) / 4
-        args.image_scale_repetition = json.dumps([args.repeat_times] * 1)
-        args.video_scale_repetition = args.image_scale_repetition
-        args.video_scale_probs = [1.0 for _ in json.loads(args.image_scale_repetition)]
         args.num_of_label_value = args.num_lvl
         args.semantic_num_lvl = args.num_lvl
         args.detail_num_lvl = args.num_lvl
@@ -123,19 +127,15 @@ class GRNPipeline:
                 self.refine_mode = 'ar_discrete_GRN_bit'
                 self.add_class_token = 0
                 self.resample_rand_labels_per_step = 0
-                self.tau = 1.0
                 self.cfg_val = 3.0
-                self.taui = 1.0
-                self.tauv = 1.0
                 self.scale_repetition = ''
                 self.gt_leak = -1
                 self.use_refined_prompt = None
                 self.use_prompt_engineering = 0
                 self.quality_prompt = ''
                 self.meta = ''
-                self.train_split_file = './data/infinity_toy_data/splits/1.000_000002500.jsonl'
+                self.train_split_file = ''
                 self.n_sampes = 1
-                self.repeat_times = 30
                 self.other_device = 'cuda' if torch.cuda.is_available() else 'cpu'
         return Args()
 
@@ -156,9 +156,15 @@ class GRNPipeline:
         negative_prompt='',
         guidance_scale=3.0,
         temperature=1.0,
-        num_inference_steps=50,
+        complexity_aware_Tmin=10,
+        complexity_aware_Tmax=50,
+        complexity_aware_k = 0,
+        complexity_aware_b = 50,
+        complexity_aware_wp = 5,
+        snr_shift = 1.,
         width=512,
         height=512,
+        duration=2.,
         generator=None,
         content_type='image',
         seed=None,
@@ -171,6 +177,12 @@ class GRNPipeline:
         
         self.args.cfg_val = guidance_scale
         self.args.tau = temperature
+        self.args.complexity_aware_Tmin = complexity_aware_Tmin
+        self.args.complexity_aware_Tmax = complexity_aware_Tmax
+        self.args.complexity_aware_k = complexity_aware_k
+        self.args.complexity_aware_b = complexity_aware_b
+        self.args.complexity_aware_wp = complexity_aware_wp
+        self.args.snr_shift = snr_shift
         
         # Get dynamic resolution meta
         dynamic_resolution_h_w, h_div_w_templates = get_dynamic_resolution_meta(
@@ -186,10 +198,9 @@ class GRNPipeline:
         
         if content_type == "image":
             num_frames = 1
-            mapped_duration = 0
+            duration = 0
         else:
-            mapped_duration = 5
-            num_frames = min(self.args.video_frames, int(mapped_duration * self.args.video_fps + 1))
+            num_frames = min(self.args.video_frames, int(duration * self.args.video_fps + 1))
         
         scale_schedule = dynamic_resolution_h_w[h_div_w_template_][self.args.pn]['pt2scale_schedule'][(num_frames - 1) // 4 + 1]
         
