@@ -290,10 +290,10 @@ video_file = result.videos[0]
 
 ---
 
-## HBQ Tokenizer
+## 📦 HBQ Tokenizer
 
 ### Data
-Image Dataset, e.g., labels/imagenet/train.txt:
+Image Dataset, e.g., data_root/username/labels/imagenet/train.txt:
 ```
 [image_1_full_path]
 [image_2_full_path]
@@ -301,7 +301,7 @@ Image Dataset, e.g., labels/imagenet/train.txt:
 ...
 ```
 
-Video Dataset, e.g., labels_hanjian/high-quality-video/horizontal_videos.txt
+Video Dataset, e.g., data_root/username/labels_hanjian/high-quality-video/horizontal_videos.txt
 ```
 [video_1_full_path]
 [video_2_full_path]
