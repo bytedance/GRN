@@ -290,6 +290,41 @@ video_file = result.videos[0]
 
 ---
 
+## HBQ Tokenizer
+
+### Data
+Image Dataset, e.g., labels/imagenet/train.txt:
+```
+[image_1_full_path]
+[image_2_full_path]
+[image_3_full_path]
+...
+```
+
+Video Dataset, e.g., labels_hanjian/high-quality-video/horizontal_videos.txt
+```
+[video_1_full_path]
+[video_2_full_path]
+[video_3_full_path]
+...
+```
+
+### Train
+For example, set `latent_channels=16/64` and `quant_method=hierarchical_binary_quant_round_4` in `scripts/hbq_tokenizer_train.sh`, then run:
+```bash
+cd grn/tokenizer
+bash scripts/hbq_tokenizer_train.sh
+```
+
+### Eval
+For example, set `latent_channels=16/64` and `quant_method=hierarchical_binary_quant_round_4` in `scripts/hbq_tokenizer_train.sh`, then run:
+```bash
+cd grn/tokenizer
+bash scripts/hbq_tokenizer_eval.sh
+```
+
+---
+
 ## 📧 Contact
 
 If you are interested in scaling GRN for image generation / image editing / video generation / video editing / unified model directions, please feel free to reach out!
