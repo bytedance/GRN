@@ -1,11 +1,11 @@
 # GRN: Generative Refinement Networks
 
 [![arXiv](https://img.shields.io/badge/arXiv%20paper-2604.13030-b31b1b.svg)](https://arxiv.org/abs/2604.13030)
-[![Homepage](https://img.shields.io/badge/🏠%20Homepage-GRN-green.svg)](https://mgenai.github.io/GRN/)
+[![Homepage](https://img.shields.io/badge/🏠%20Homepage-GRN-green.svg)](https://bytedance.github.io/GRN/)
 [![Models](https://img.shields.io/badge/🤗%20Hugging%20Face-Models-blue.svg)](https://huggingface.co/bytedance-research/GRN)
 [![Demo](https://img.shields.io/badge/🤗%20Hugging%20Face-Demo-yellow.svg)](https://huggingface.co/spaces/hanjian/GRN)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/MGenAI/GRN?style=social)](https://github.com/MGenAI/GRN)
+[![GitHub stars](https://img.shields.io/github/stars/bytedance/GRN?style=social)](https://github.com/bytedance/GRN)
 
 ---
 
@@ -157,7 +157,7 @@ Try our interactive Text-to-Video demo on Discord:
 
 ### Step 1: Clone the repository
 ```bash
-git clone https://github.com/MGenAI/GRN
+git clone https://github.com/bytedance/GRN
 cd GRN
 ```
 
