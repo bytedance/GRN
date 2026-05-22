@@ -9,6 +9,10 @@
 
 ---
 
+## 🔥 Updates!!
+* May 23, 2026: 🌺 We release the training and evaluation code for HBQ tokenizer, enjoy~
+* April 14, 2026: 🤗 Paper and code release
+
 ## 📋 Table of Contents
 
 - [🌟 Introduction](#-introduction)
@@ -24,6 +28,10 @@
   - [Inference](#inference)
 - [🎬 Text-to-Video](#-text-to-video)
   - [Inference](#inference-1)
+- [📦 HBQ Tokenizer](#-hbq-tokenizer)
+  - [Data](#data-hbq)
+  - [Training](#training-hbq)
+  - [Evaluation](#evaluation-hbq)
 - [📧 Contact](#-contact)
 - [🤗 Acknowledgements](#-acknowledgements)
 - [📝 Citation](#-citation)
@@ -309,14 +317,14 @@ Video Dataset, e.g., data_root/username/labels_hanjian/high-quality-video/horizo
 ...
 ```
 
-### Train
+### Training
 For example, set `latent_channels=16/64` and `quant_method=hierarchical_binary_quant_round_4` in `scripts/hbq_tokenizer_train.sh`, then run:
 ```bash
 cd grn/tokenizer
 bash scripts/hbq_tokenizer_train.sh
 ```
 
-### Eval
+### Evaluation
 For example, set `latent_channels=16/64` and `quant_method=hierarchical_binary_quant_round_4` in `scripts/hbq_tokenizer_train.sh`, then run:
 ```bash
 cd grn/tokenizer
