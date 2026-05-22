@@ -29,7 +29,7 @@
 - [🎬 Text-to-Video](#-text-to-video)
   - [Inference](#inference-1)
 - [📦 HBQ Tokenizer](#-hbq-tokenizer)
-  - [Data](#-data)
+  - [Data](#data)
   - [Training](#training-1)
   - [Evaluation](#evaluation-1)
 - [📧 Contact](#-contact)
