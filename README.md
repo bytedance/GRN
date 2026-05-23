@@ -1,4 +1,4 @@
-# GRN: Generative Refinement Networks (Support C2I & T2I & T2V)
+# GRN: Generative Refinement Networks
 
 [![arXiv](https://img.shields.io/badge/arXiv%20paper-2604.13030-b31b1b.svg)](https://arxiv.org/abs/2604.13030)
 [![Homepage](https://img.shields.io/badge/🏠%20Homepage-GRN-green.svg)](https://bytedance.github.io/GRN/)
