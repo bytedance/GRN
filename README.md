@@ -224,7 +224,7 @@ We use [torch-fidelity](https://github.com/LTH14/torch-fidelity) to evaluate FID
 ## 🎨 Text-to-Image
 
 ### Train
-run `bash scripts/train_GRN_ind_t2i.sh`
+Run `bash scripts/train_GRN_ind_t2i.sh`
 
 ### Inference
 
@@ -266,7 +266,7 @@ image.save('./generated_image.jpg')
 ## 🎬 Text-to-Video
 
 ### Train
-run `bash scripts/train_GRN_ind_t2v.sh`
+Run `bash scripts/train_GRN_ind_t2v.sh`
 
 ### Inference
 
