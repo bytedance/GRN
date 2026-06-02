@@ -10,6 +10,7 @@
 ---
 
 ## 🔥 Updates!!
+* June 3, 2026: 🍉 A toy image-video dataset is provided for GRN-T2I/GRN-T2V training and fine-tuning.
 * May 23, 2026: 🌺 We release the training and evaluation code for HBQ tokenizer, enjoy~
 * April 14, 2026: 🤗 Paper and code release
 
@@ -25,11 +26,15 @@
   - [Training](#training)
   - [Evaluation](#evaluation)
 - [🎨 Text-to-Image](#-text-to-image)
+  - [Data](#data)
+  - [Train](#train)
   - [Inference](#inference)
 - [🎬 Text-to-Video](#-text-to-video)
+  - [Data](#data-1)
+  - [Train](#train-1)
   - [Inference](#inference-1)
 - [📦 HBQ Tokenizer](#-hbq-tokenizer)
-  - [Data](#data)
+  - [Data](#data-2)
   - [Training](#training-1)
   - [Evaluation](#evaluation-1)
 - [📧 Contact](#-contact)
@@ -222,6 +227,13 @@ We use [torch-fidelity](https://github.com/LTH14/torch-fidelity) to evaluate FID
 ---
 
 ## 🎨 Text-to-Image
+### Data
+Refer to `data/toy_data/jsonls/000001/0001_0008_000000100.jsonl`
+```
+{"image_path": "[image_path_1]", "long_caption": "xxx", "long_caption_type": "caption-InternVL2.0", "text": "", "short_caption_type": "blip2_caption", "width": 1080, "height": 1920}
+{"image_path": "[image_path_2]", "long_caption": "xxx", "long_caption_type": "caption-InternVL2.0", "text": "", "short_caption_type": "blip2_caption", "width": 1080, "height": 1920}
+...
+```
 
 ### Train
 Run `bash scripts/train_GRN_ind_t2i.sh`
@@ -264,6 +276,13 @@ image.save('./generated_image.jpg')
 ---
 
 ## 🎬 Text-to-Video
+### Data
+Refer to `data/toy_data/jsonls/000001/0001_0008_000000100.jsonl`
+```
+{"video_path": "[video_path_1]", "begin_frame_id": xxx, "end_frame_id": xxx, "quality_prompt": "There is text in the video.", "fps": 25.0, "duration": 3.88, "width": 1280, "height": 720, "caption": [{"type": "short", "content": "[short_caption]"}, {"type": "medium", "content": "[medium_caption]"}, {"type": "long", "content": "[long_caption]"}]}
+{"video_path": "[video_path_1]", "begin_frame_id": xxx, "end_frame_id": xxx, "quality_prompt": "The quality is very high!", "fps": 25.0, "duration": 3.88, "width": 1280, "height": 720, "caption": [{"type": "short", "content": "[short_caption]"}, {"type": "medium", "content": "[medium_caption]"}, {"type": "long", "content": "[long_caption]"}]}
+...
+```
 
 ### Train
 Run `bash scripts/train_GRN_ind_t2v.sh`
