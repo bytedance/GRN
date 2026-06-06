@@ -25,3 +25,4 @@ weights
 .DS_Store
 local
 *.mp4
+tmp

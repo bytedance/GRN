@@ -238,7 +238,8 @@ def build_model_optimizer(args):
 def build_dataset(args):
     train_dataset = build_joint_dataset(
         args, 
-        args.data_path,
+        args.meta_folders,
+        args.meta_folder_repeats,
         max_caption_len=args.tlen, 
         short_prob=args.short_cap_prob, 
         load_vae_instead_of_image=False
@@ -310,7 +311,6 @@ def train_one_ep(
     [me.add_meter(x, misc.SmoothedValue(window_size=1, fmt='{median:.3f} ({global_avg:.3f})')) for x in ['L', 'L_i', 'L_v']]
     [me.add_meter(x, misc.SmoothedValue(window_size=1, fmt='{median:.2f} ({global_avg:.2f})')) for x in ['Acc', 'Acc_i', 'Acc_v']]
     [me.add_meter(x, misc.SmoothedValue(window_size=1, fmt='{median:.2f} ({global_avg:.2f})')) for x in ['seq_usage']]
-    
     # ============================================= iteration loop begins =============================================
     start_it = 0
     for it, data in me.log_every(start_it, iters_train, ld_or_itrt, args.log_freq, args.log_every_iter, header):

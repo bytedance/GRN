@@ -44,6 +44,7 @@ result = pipeline(
     snr_shift = 1.,
     h_div_w=9/16,
     duration=2.,
+    first_frame_condition=False,
     content_type='video',
     seed=42,
 )

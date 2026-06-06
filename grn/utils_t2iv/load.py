@@ -42,7 +42,6 @@ def build_vae_gpt(args, device='cuda'):
         pad_to_multiplier=args.pad_to_multiplier,
         use_flex_attn=args.use_flex_attn,
         num_of_label_value=args.num_of_label_value,
-        pn=args.pn,
         train_h_div_w_list=None,
         apply_spatial_patchify=args.apply_spatial_patchify,
         dynamic_scale_schedule=args.dynamic_scale_schedule,

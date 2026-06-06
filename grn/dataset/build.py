@@ -89,17 +89,18 @@ def print_aug(transform, label):
 
 def build_joint_dataset(
     args,
-    data_path: str,
+    meta_folders: str,
+    meta_folder_repeats: str,
     max_caption_len: int,
     short_prob=0.2,
     load_vae_instead_of_image=False
 ):
     return JointViDataset(
-        meta_folder=data_path, 
+        meta_folders=meta_folders, 
+        meta_folder_repeats=meta_folder_repeats,
         max_caption_len=max_caption_len,
         short_prob=short_prob, 
         load_vae_instead_of_image=load_vae_instead_of_image, 
-        pn=args.pn,
         video_fps=args.video_fps,
         num_frames=args.video_frames,
         online_t5=args.online_t5,

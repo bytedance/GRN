@@ -62,10 +62,10 @@ def gen_one_example(
     input_use_interplote_up=False,
     args=None,
     get_visual_rope_embeds=None,
-    context_info=None,
     noise_list=None,
     return_summed_code_only=False,
     class_token_id=0,
+    first_frame_condition=False,
 ):
     sstt = time.time()
     if not isinstance(cfg_list, list):
@@ -94,10 +94,10 @@ def gen_one_example(
             input_use_interplote_up=input_use_interplote_up,
             args=args,
             get_visual_rope_embeds=get_visual_rope_embeds,
-            context_info=context_info,
             noise_list=noise_list,
             return_summed_code_only=return_summed_code_only,
             class_token_id=class_token_id,
+            first_frame_condition=first_frame_condition,
         )
         _, pred_multi_scale_bit_labels, img_list = out
             

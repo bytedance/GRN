@@ -161,6 +161,7 @@ class GRNPipeline:
         complexity_aware_k = 0,
         complexity_aware_b = 50,
         complexity_aware_wp = 5,
+        first_frame_condition = False,
         snr_shift = 1.,
         h_div_w=1.,
         duration=2.,
@@ -204,7 +205,6 @@ class GRNPipeline:
         
         self.args.first_full_spatial_size_scale_index = get_first_full_spatial_size_scale_index(scale_schedule)
         self.args.tower_split_index = self.args.first_full_spatial_size_scale_index + 1
-        context_info = self.get_scale_pack_info(scale_schedule, self.args.first_full_spatial_size_scale_index, self.args)
         
         # Generate content
         generated_image = gen_one_example(
@@ -213,7 +213,7 @@ class GRNPipeline:
             cfg_list=self.args.cfg_val, tau_list=self.args.tau, scale_schedule=scale_schedule,
             cfg_insertion_layer=[self.args.cfg_insertion_layer], vae_latent_dim=self.args.vae_latent_dim,
             args=self.args, get_visual_rope_embeds=self.get_visual_rope_embeds,
-            context_info=context_info, noise_list=None, class_token_id=0,
+            noise_list=None, first_frame_condition=first_frame_condition,
         )
         
         if len(generated_image.shape) == 3:
