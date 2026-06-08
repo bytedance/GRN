@@ -29,3 +29,4 @@ tmp
 .git_bk
 demo
 .git_hf_space
+*.pyc
