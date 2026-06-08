@@ -71,7 +71,7 @@ GRN achieves state-of-the-art results on ImageNet reconstruction and class-condi
 
 <figure align="center">
   <figcaption><strong><em>Generative Refinement Framework</em></strong></figcaption>
-  <img src="demo/framework.jpg" width="100%" alt="Framework">
+  <img src="assets/framework.jpg" width="100%" alt="Framework">
 </figure>
 
 <p align="center">
@@ -131,13 +131,13 @@ Starting from a random token map, GRN randomly selects more predictions at each 
 ### GRN-2B Class-to-Image Examples
 <figure align="center">
   <!-- <figcaption><strong><em>GRN-2B Class-to-Image Examples</em></strong></figcaption> -->
-  <img src="demo/c2i_examples.jpg" width="100%" alt="Class-to-Image Examples">
+  <img src="assets/c2i_examples.jpg" width="100%" alt="Class-to-Image Examples">
 </figure>
 
 ### GRN-2B Text-to-Image Examples
 <figure align="center">
   <!-- <figcaption><strong><em>GRN-2B Text-to-Image Examples</em></strong></figcaption> -->
-  <img src="demo/t2i_examples.jpg" width="100%" alt="Text-to-Image Examples">
+  <img src="assets/t2i_examples.jpg" width="100%" alt="Text-to-Image Examples">
 </figure>
 
 ---
@@ -161,7 +161,7 @@ Try our interactive Text-to-Video demo on Discord:
 
 <figure align="center">
   <figcaption><strong><em>T2V Demo on Discord</em></strong></figcaption>
-  <img src="demo/t2v_demo.png" width="100%" alt="T2V Demo">
+  <img src="assets/t2v_demo.png" width="100%" alt="T2V Demo">
 </figure>
 
 ---
