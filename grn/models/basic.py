@@ -14,12 +14,6 @@ from grn.models.rope import apply_rotary_emb
 from grn.utils_t2iv.sequence_parallel import sp_all_to_all, SequenceParallelManager as sp_manager
 
 try:
-    from flash_attn.cute import flash_attn_varlen_func
-except:
-    from flash_attn import flash_attn_varlen_func
-                
-# Import flash_attn's fused ops
-try:
     from flash_attn.ops.rms_norm import rms_norm as rms_norm_impl
 except ImportError:
     def rms_norm_impl(x, weight, epsilon):

@@ -1,3 +1,13 @@
+---
+license: mit
+title: Generative Refinement Networks
+sdk: gradio
+emoji: 🚀
+colorFrom: red
+colorTo: yellow
+pinned: true
+short_description: "Generative Refinement Networks"
+---
 # GRN: Generative Refinement Networks
 
 [![arXiv](https://img.shields.io/badge/arXiv%20paper-2604.13030-b31b1b.svg)](https://arxiv.org/abs/2604.13030)
@@ -10,6 +20,7 @@
 ---
 
 ## 🔥 Updates!!
+* June 8, 2026: ✈️ The training & fine-tuning code for GRN-T2I and GRN-T2V is released.
 * June 3, 2026: 🍉 A toy image-video dataset is provided for GRN-T2I/GRN-T2V training and fine-tuning.
 * May 23, 2026: 🌺 We release the training and evaluation code for HBQ tokenizer, enjoy~
 * April 14, 2026: 🤗 Paper and code release
@@ -21,22 +32,22 @@
 - [🚀 Demo](#-demo)
 - [📦 Model Zoo](#-model-zoo)
 - [🛠️ Installation](#️-installation)
-- [🖼️ Class-to-Image](#️-class-to-image)
-  - [Dataset](#dataset)
+- [📦 HBQ Tokenizer](#-hbq-tokenizer)
+  - [Data](#data)
   - [Training](#training)
   - [Evaluation](#evaluation)
+- [🖼️ Class-to-Image](#️-class-to-image)
+  - [Data](#data-1)
+  - [Training](#training-2)
+  - [Evaluation](#evaluation-1)
 - [🎨 Text-to-Image](#-text-to-image)
-  - [Data](#data)
-  - [Train](#train)
+  - [Data](#data-2)
+  - [Training](#training-2)
   - [Inference](#inference)
 - [🎬 Text-to-Video](#-text-to-video)
-  - [Data](#data-1)
-  - [Train](#train-1)
+  - [Data](#data-3)
+  - [Training](#training-3)
   - [Inference](#inference-1)
-- [📦 HBQ Tokenizer](#-hbq-tokenizer)
-  - [Data](#data-2)
-  - [Training](#training-1)
-  - [Evaluation](#evaluation-1)
 - [📧 Contact](#-contact)
 - [🤗 Acknowledgements](#-acknowledgements)
 - [📝 Citation](#-citation)
@@ -191,9 +202,44 @@ Check this [issue](https://github.com/conda/conda/issues/13812#issuecomment-2071
 
 ---
 
+## 📦 HBQ Tokenizer
+
+### Data
+Image Dataset, e.g., data_root/username/labels/imagenet/train.txt:
+```
+[image_1_full_path]
+[image_2_full_path]
+[image_3_full_path]
+...
+```
+
+Video Dataset, e.g., data_root/username/labels_hanjian/high-quality-video/horizontal_videos.txt
+```
+[video_1_full_path]
+[video_2_full_path]
+[video_3_full_path]
+...
+```
+
+### Training
+For example, set `latent_channels=16/64` and `quant_method=hierarchical_binary_quant_round_4` in `scripts/hbq_tokenizer_train.sh`, then run:
+```bash
+cd grn/tokenizer
+bash scripts/hbq_tokenizer_train.sh
+```
+
+### Evaluation
+For example, set `latent_channels=16/64` and `quant_method=hierarchical_binary_quant_round_4` in `scripts/hbq_tokenizer_train.sh`, then run:
+```bash
+cd grn/tokenizer
+bash scripts/hbq_tokenizer_eval.sh
+```
+
+---
+
 ## 🖼️ Class-to-Image
 
-### Dataset
+### Data
 Download [ImageNet](http://image-net.org/download) dataset, and place it in your `IMAGENET_PATH`.
 
 ### Training
@@ -235,8 +281,8 @@ Refer to `data/toy_data/jsonls/000001/0001_0008_000000100.jsonl`
 ...
 ```
 
-### Train
-Run `bash scripts/train_GRN_ind_t2i.sh`
+### Training
+Run `bash scripts/t2iv/train_GRN_bit_t2iv.sh`
 
 ### Inference
 
@@ -284,8 +330,8 @@ Refer to `data/toy_data/jsonls/000001/0001_0008_000000100.jsonl`
 ...
 ```
 
-### Train
-Run `bash scripts/train_GRN_ind_t2v.sh`
+### Training
+Run `bash scripts/t2iv/train_GRN_bit_t2iv.sh`
 
 ### Inference
 
@@ -319,41 +365,6 @@ result = pipeline(
     seed=42,
 )
 video_file = result.videos[0]
-```
-
----
-
-## 📦 HBQ Tokenizer
-
-### Data
-Image Dataset, e.g., data_root/username/labels/imagenet/train.txt:
-```
-[image_1_full_path]
-[image_2_full_path]
-[image_3_full_path]
-...
-```
-
-Video Dataset, e.g., data_root/username/labels_hanjian/high-quality-video/horizontal_videos.txt
-```
-[video_1_full_path]
-[video_2_full_path]
-[video_3_full_path]
-...
-```
-
-### Training
-For example, set `latent_channels=16/64` and `quant_method=hierarchical_binary_quant_round_4` in `scripts/hbq_tokenizer_train.sh`, then run:
-```bash
-cd grn/tokenizer
-bash scripts/hbq_tokenizer_train.sh
-```
-
-### Evaluation
-For example, set `latent_channels=16/64` and `quant_method=hierarchical_binary_quant_round_4` in `scripts/hbq_tokenizer_train.sh`, then run:
-```bash
-cd grn/tokenizer
-bash scripts/hbq_tokenizer_eval.sh
 ```
 
 ---

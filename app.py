@@ -15,7 +15,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def load_pipeline():
     global pipe
-    print("Loading GRN pipeline...")
+    print(f"Loading GRN pipeline ({device=})...")
     # 从 Hugging Face Hub 下载权重
     pipe = GRNPipeline.from_pretrained(
         hf_repo_id='bytedance-research/GRN',

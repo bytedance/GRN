@@ -16,12 +16,14 @@ from timm.models import create_model
 def load_visual_tokenizer(args, device=None):
     if not device:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    elif isinstance(device, str):
+        device = torch.device(device)
     vae = HBQ_Tokenizer(args=args, latent_channels=args.detail_scale_dim, encoder_out_type='feature_tanh')
     vae.eval()
-    vae = vae.to('cuda')
+    vae = vae.to(device)
     for param in vae.parameters():
         param.requires_grad = False
-    state_dict = torch.load(args.vae_path, map_location='cuda')
+    state_dict = torch.load(args.vae_path, map_location=device)
     if 'ema' in state_dict:
         print(f'Load ema vae weights')
         state_dict = state_dict['ema']

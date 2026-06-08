@@ -26,3 +26,6 @@ weights
 local
 *.mp4
 tmp
+.git_bk
+demo
+.git_hf_space
