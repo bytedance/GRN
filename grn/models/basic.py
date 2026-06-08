@@ -187,7 +187,7 @@ class SelfAttention(nn.Module):
             attn_output = attn_output[0].reshape(B, L, C).contiguous()
         else:
             # slow attn
-            attn_output = slow_attn(query=query_states, key=key_states, value=value_states, scale=self.scale, attn_mask=attn_bias_or_two_vector, dropout_p=0).transpose(1, 2).reshape(B, L, C)
+            attn_output = slow_attn(query=query_states.transpose(1, 2), key=key_states.transpose(1, 2), value=value_states.transpose(1, 2), scale=self.scale, attn_mask=attn_bias_or_two_vector, dropout_p=0).transpose(1, 2).reshape(B, L, C)
 
         if sp_manager.sp_on():
             # [B, raw_L, C/sp] --> [B, raw_L/sp, C]

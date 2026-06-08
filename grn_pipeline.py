@@ -38,13 +38,15 @@ class GRNPipeline:
         hf_repo_id=None,
         task='t2i',
         pn='1M',
+        model='GRN2b',
+        use_slow_attn=False,
     ):
         # download weights from Hugging Face Hub
         if hf_repo_id:
             from huggingface_hub import hf_hub_download, snapshot_download
             print(f"download weights from Hugging Face Hub: {hf_repo_id}")
             if task == 'T2I':
-                model_path = hf_hub_download(repo_id=hf_repo_id, filename="GRN_T2I_2B.pth")
+                model_path = hf_hub_download(repo_id=hf_repo_id, filename="GRN_T2I_2B_FSA_94600.pth")
             elif task == 'T2V':
                 model_path = hf_hub_download(repo_id=hf_repo_id, filename="GRN_T2V_2B.pth")
             else:
@@ -55,9 +57,11 @@ class GRNPipeline:
             print(os.listdir(snapshot_path))
         
         args = cls._get_default_args()
+        args.model = model
         args.model_path = model_path
         args.vae_path = vae_path
         args.text_encoder_ckpt = text_encoder_ckpt
+        args.use_slow_attn = use_slow_attn
         if isinstance(device, str):
             device = torch.device(device)
         args.other_device = device
@@ -94,7 +98,6 @@ class GRNPipeline:
                 self.hbq_round = 4
                 self.rope_type = '3d'
                 self.num_lvl = 2
-                self.model = 'GRN2b'
                 self.rope2d_normalized_by_hw = 2
                 self.text_channels = 4096
                 self.apply_spatial_patchify = 0

@@ -232,7 +232,10 @@ def load_transformer(vae, args):
         torch.cuda.empty_cache()
     print(f'[Load model weights]')
     if state_dict:
-        print(model.load_state_dict(state_dict, strict=True))
+        if 'trainer' in state_dict:
+            print(model.load_state_dict(state_dict['trainer']['gpt_fsdp'], strict=True))
+        else:
+            print(model.load_state_dict(state_dict, strict=True))
     return model
 
 def images2video(ndarray_image_list, fps=24, save_filepath='tmp.mp4'):

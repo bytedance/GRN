@@ -12,11 +12,9 @@ import torch.nn.functional as F
 import torch.utils.checkpoint
 import tqdm
 from timm.models import register_model
-from torch.nn.attention.flex_attention import flex_attention
 
 import grn.utils_t2iv.dist as dist
 from grn.models.basic import FastRMSNorm, SelfAttnBlock
-from grn.models.flex_attn_mask import build_flex_attn_func
 from grn.models.rope import precompute_rope3d_freqs_grid
 from grn.schedules.dynamic_resolution import get_dynamic_resolution_meta
 from grn.utils_t2iv.dist import for_visualize
@@ -121,6 +119,17 @@ def bld_to_bthwd(item: torch.Tensor, patch_time: int, patch_height: int, patch_w
     """Reshape a sequence tensor to a spatial tensor."""
     batch_size = item.shape[0]
     return item.reshape(batch_size, patch_time, patch_height, patch_width, -1)
+
+
+def build_attn_mask(seqlens, device):
+    attn_mask = torch.zeros((1, 1, sum(seqlens), sum(seqlens)), dtype=torch.bool, device=device)
+    q_start = 0
+    for i in range(len(seqlens)):
+        q_len = seqlens[i]
+        q_end = q_start + q_len
+        attn_mask[:, :, q_start:q_end, q_start:q_end] = True
+        q_start = q_end
+    return attn_mask
 
 
 class FsqHead(nn.Module):
@@ -357,11 +366,9 @@ class GRN(nn.Module):
         visual_rope_cache: Optional[List[torch.Tensor]] = None,
         sequece_packing_scales: Optional[List[List[Tuple[int, int, int]]]] = None,
         super_scale_lengths: Optional[List[int]] = None,
-        super_querysid_super_refsid: Optional[Any] = None,
         other_info_by_scale: Optional[List[Dict[str, Any]]] = None,
         gt_BL: Optional[List[torch.Tensor]] = None,
         x_BLC_mask: Optional[torch.Tensor] = None,
-        pad_seq_len: int = 0,
         scale_or_time_ids: Optional[torch.Tensor] = None,
         return_last_hidden_states: bool = False,
         **kwargs: Any,
@@ -375,18 +382,15 @@ class GRN(nn.Module):
             visual_rope_cache: Cache for visual RoPE embeddings
             sequece_packing_scales: Scales for sequence packing
             super_scale_lengths: Lengths of super scales
-            super_querysid_super_refsid: Query and reference scale IDs
             other_info_by_scale: Meta info for scales
             gt_BL: Ground truth
             x_BLC_mask: Mask for input sequence
-            pad_seq_len: Padding length
             scale_or_time_ids: IDs for scale or time embeddings
             return_last_hidden_states: Whether to return last hidden states
             
         Returns:
             Tuple of (logits_norm, loss_list, acc_list, valid_sequence_ratio)
         """
-        batch_size = 1 # sequence packing
         device = x_BLC[0].device
 
         # [1. get input sequence x_BLC]
@@ -496,9 +500,7 @@ class GRN(nn.Module):
         gt_leak: int = 0,
         args: Optional[Any] = None,
         get_visual_rope_embeds: Optional[Any] = None,
-        context_info: Optional[Any] = None,
         noise_list: Optional[List[torch.Tensor]] = None,
-        class_token_id: int = 0,
         uncond_class_token_id: int = 1000,
         first_frame_condition: bool = False,
         **kwargs: Any,
@@ -512,7 +514,7 @@ class GRN(nn.Module):
         rng = None
         assert len(cfg_list) >= len(scale_schedule), "Not enough CFG values for scales"
         assert len(tau_list) >= len(scale_schedule), "Not enough tau values for scales"
-        attn_mask = None
+
         ret, idx_Bl_list = [], []  # current length, list of reconstructed images
         for b in self.unregistered_blocks: b.attn.kv_caching(True)
         total_steps = args.max_infer_steps
@@ -565,9 +567,11 @@ class GRN(nn.Module):
 
         cu_seqlens = torch.tensor([0]+tmp_seqlens, device=device).cumsum(-1).to(torch.int32)
         max_seqlen = max(tmp_seqlens)
+
         pure_rand_labels = torch.randint(low=0, high=classes, size=labels_shape, device=infer_device, dtype=infer_dtype)
         mixed_xt = pure_rand_labels
         next_pt = 0.
+        attn_mask = build_attn_mask(tmp_seqlens, device) if args.use_slow_attn else None
         for cur_inner_round_si in range(args.max_infer_steps):
             cur_pt = next_pt
             is_last_step = np.abs(cur_pt - 1) < 0.02
@@ -637,7 +641,6 @@ class GRN(nn.Module):
                 'pred_cond_flip_ratio': pred_cond_flip_ratio.item(),
                 'pred_cfg_flip_ratio': pred_cfg_flip_ratio.item(),
                 'pred_sample_flip_ratio': pred_sample_flip_ratio.item(),
-                'uncond_class_token_id': uncond_class_token_id,
                 'pred_zero_ratio': pred_zero_ratio.item(),
                 'pred_one_ratio': pred_one_ratio.item(),
                 'meta': args.meta,
@@ -651,7 +654,7 @@ class GRN(nn.Module):
                 pred_cond_acc = (gt_labels==pred_cond_labels).to(float).mean().item()
                 pred_cfg_acc = (gt_labels==pred_cfg_labels).to(float).mean().item()
                 pred_sample_acc = (gt_labels==pred_sample_labels).to(float).mean().item()
-                print(f'{si=} {repeat_idx=} {entrophy=:.4f} {pred_cond_acc=:.4f} {pred_cfg_acc=:.4f} {pred_sample_acc=:.4f}')
+                print(f'{repeat_idx=} {entrophy=:.4f} {pred_cond_acc=:.4f} {pred_cfg_acc=:.4f} {pred_sample_acc=:.4f}')
                 self.entrophy_statistics[-1][-1].update({
                     'gt_flip_ratio': gt_flip_ratio,
                     'pred_cond_acc': pred_cond_acc,

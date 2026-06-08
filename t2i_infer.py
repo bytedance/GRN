@@ -6,12 +6,14 @@ pipeline = GRNPipeline.from_pretrained(
     hf_repo_id='bytedance-research/GRN',
     task='T2I',
     pn='1M', 
+    model='GRN2b',
+    use_slow_attn=True,
     device='cpu',
 ).to('cuda')
 
 # Generate one image
 result = pipeline(
-    prompt="A cute cat playing in the garden",
+    prompt="<T2I>" + "A cute cat playing in the garden",
     guidance_scale=3.0,
     temperature=1.1,
     complexity_aware_Tmin=10,

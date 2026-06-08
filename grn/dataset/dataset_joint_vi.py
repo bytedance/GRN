@@ -70,10 +70,6 @@ class VideoReaderWrapper(VideoReader):
         self.seek(0)
         return frames
 
-
-def local_or_download(info, down_size_limit=140, tmp_dir='/dev/shm/tmp'):
-    return info["video_path"]
-
 class JointViDataset(Dataset):
     def __init__(
         self,
@@ -597,7 +593,6 @@ class JointViDataset(Dataset):
             info["end_frame_id"],
         )
 
-        # if True:
         try:
             img_T3HW, raw_features_cthw, feature_cache_file, text_features_lenxdim, text_feature_cache_file = None, None, None, None, None
             img_T3HW_4additional_pn = {}
@@ -623,7 +618,7 @@ class JointViDataset(Dataset):
                     return False, None
             pn_list = [info['pn']]
             if raw_features_cthw is None:
-                tmp_local_path = local_or_download(info, self.down_size_limit)
+                tmp_local_path = info["video_path"]
                 if not osp.exists(tmp_local_path):
                     return False, None
                 video = EncodedVideoDecord(tmp_local_path, os.path.basename(tmp_local_path), num_threads=0)
@@ -642,8 +637,6 @@ class JointViDataset(Dataset):
                     img_T3HW = torch.stack(img_T3HW, 0)
                     img_T3HW_4additional_pn[pn] = img_T3HW
                 del video
-                assert tmp_local_path.startswith('/dev/shm/tmp')
-                os.remove(tmp_local_path)
                 assert img_T3HW.shape[-3:] == (3, tgt_h, tgt_w)
             data_item = {
                 'text_input': text_input,
@@ -658,8 +651,6 @@ class JointViDataset(Dataset):
                 data_item.update({f'img_T3HW_{pn}': img_T3HW_4additional_pn.get(pn, None)})
             return True, data_item
         except Exception as e:
-            if tmp_local_path and osp.exists(tmp_local_path):
-                os.remove(tmp_local_path)
             self.print(f'prepare_video_input error: {e}, info: {info}')
             return False, None
 
