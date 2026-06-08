@@ -1,4 +1,4 @@
----
+<!-- ---
 license: mit
 title: Generative Refinement Networks
 sdk: gradio
@@ -7,7 +7,7 @@ colorFrom: red
 colorTo: yellow
 pinned: true
 short_description: "Generative Refinement Networks"
----
+--- -->
 # GRN: Generative Refinement Networks
 
 [![arXiv](https://img.shields.io/badge/arXiv%20paper-2604.13030-b31b1b.svg)](https://arxiv.org/abs/2604.13030)
@@ -188,8 +188,9 @@ cd GRN
 ### Step 2: Create conda environment
 A suitable [conda](https://conda.io/) environment named `GRN` can be created and activated with:
 ```bash
-conda env create -f environment.yaml
+conda create -n GRN python=3.11
 conda activate GRN
+pip install -r requirements.txt
 ```
 
 ### Troubleshooting
@@ -274,7 +275,7 @@ We use [torch-fidelity](https://github.com/LTH14/torch-fidelity) to evaluate FID
 
 ## 🎨 Text-to-Image
 ### Data
-Refer to `data/toy_data/jsonls/000001/0001_0008_000000100.jsonl`
+Refer to `data/toy_data/jsonls/000001/0001_0800_000000100.jsonl`
 ```
 {"image_path": "[image_path_1]", "long_caption": "xxx", "long_caption_type": "caption-InternVL2.0", "text": "", "short_caption_type": "blip2_caption", "width": 1080, "height": 1920}
 {"image_path": "[image_path_2]", "long_caption": "xxx", "long_caption_type": "caption-InternVL2.0", "text": "", "short_caption_type": "blip2_caption", "width": 1080, "height": 1920}
@@ -286,23 +287,24 @@ Run `bash scripts/t2iv/train_GRN_bit_t2iv.sh`
 
 ### Inference
 
-You can simply run `python3 t2i_infer.py` or use the following code:
+You can simply run `python3 tools/t2i_infer.py` or use the following code:
 
 ```python
 from PIL import Image
-from grn_pipeline import GRNPipeline
+from tools.grn_pipeline import GRNPipeline
 
 # Load pipeline
 pipeline = GRNPipeline.from_pretrained(
     hf_repo_id='bytedance-research/GRN',
     task='T2I',
     pn='1M', 
+    model='GRN2b',
     device='cpu',
 ).to('cuda')
 
 # Generate one image
 result = pipeline(
-    prompt="A cute cat playing in the garden",
+    prompt="<T2I>" + "A cute cat playing in the garden",
     guidance_scale=3.0,
     temperature=1.1,
     complexity_aware_Tmin=10,
@@ -323,7 +325,7 @@ image.save('./generated_image.jpg')
 
 ## 🎬 Text-to-Video
 ### Data
-Refer to `data/toy_data/jsonls/000001/0001_0008_000000100.jsonl`
+Refer to `data/toy_data/jsonls/000001/0001_0800_000000100.jsonl`
 ```
 {"video_path": "[video_path_1]", "begin_frame_id": xxx, "end_frame_id": xxx, "quality_prompt": "There is text in the video.", "fps": 25.0, "duration": 3.88, "width": 1280, "height": 720, "caption": [{"type": "short", "content": "[short_caption]"}, {"type": "medium", "content": "[medium_caption]"}, {"type": "long", "content": "[long_caption]"}]}
 {"video_path": "[video_path_1]", "begin_frame_id": xxx, "end_frame_id": xxx, "quality_prompt": "The quality is very high!", "fps": 25.0, "duration": 3.88, "width": 1280, "height": 720, "caption": [{"type": "short", "content": "[short_caption]"}, {"type": "medium", "content": "[medium_caption]"}, {"type": "long", "content": "[long_caption]"}]}
@@ -335,17 +337,18 @@ Run `bash scripts/t2iv/train_GRN_bit_t2iv.sh`
 
 ### Inference
 
-You can simply run `python3 t2v_infer.py` or use the following code:
+You can simply run `python3 tools/t2v_infer.py` or use the following code:
 
 ```python
-from grn_pipeline import GRNPipeline
+from tools.grn_pipeline import GRNPipeline
 
 # Load pipeline
 pipeline = GRNPipeline.from_pretrained(
-    hf_repo_id='bytedance-research/GRN', 
-    task='T2V', 
+    hf_repo_id='bytedance-research/GRN',
+    task='T2V',
     pn='0.41M', 
-    device='cpu'
+    model='GRN2b',
+    device='cpu',
 ).to('cuda')
 
 # Generate one video

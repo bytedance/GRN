@@ -7,7 +7,7 @@ import spaces
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from grn_pipeline import GRNPipeline
+from tools.grn_pipeline import GRNPipeline
 
 # Global pipeline
 pipe = None

@@ -1,5 +1,5 @@
 from PIL import Image
-from grn_pipeline import GRNPipeline
+from tools.grn_pipeline import GRNPipeline
 
 # Load pipeline
 pipeline = GRNPipeline.from_pretrained(
@@ -7,7 +7,7 @@ pipeline = GRNPipeline.from_pretrained(
     task='T2I',
     pn='1M', 
     model='GRN2b',
-    use_slow_attn=True,
+    use_slow_attn=False,
     device='cpu',
 ).to('cuda')
 

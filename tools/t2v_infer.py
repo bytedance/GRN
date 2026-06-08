@@ -1,4 +1,4 @@
-from grn_pipeline import GRNPipeline
+from tools.grn_pipeline import GRNPipeline
 
 negative_prompt = (
     # --- quality ---
@@ -25,6 +25,8 @@ pipeline = GRNPipeline.from_pretrained(
     hf_repo_id='bytedance-research/GRN', 
     task='T2V', 
     pn='0.41M', 
+    model='GRN2b',
+    use_slow_attn=False,
     device='cpu'
 ).to('cuda')
 
