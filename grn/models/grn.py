@@ -606,7 +606,7 @@ class GRN(nn.Module):
             pt_unshift = (cur_inner_round_si + 1) / (args.complexity_aware_Tmax - 1)
             pt_shift = shift_pt(min(1., pt_unshift), args.snr_shift)
             next_pt = 1 - np.cos(np.pi/2*pt_shift)
-            next_pt = next_pt * 0.999
+            next_pt = next_pt * 0.95
 
             pred_cond_labels = torch.argmax(pred_cond_probs, dim=-1) # [B,thw,d]
             pred_cond_labels = bld_to_bthwd(pred_cond_labels, pt, ph, pw)

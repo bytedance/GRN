@@ -30,13 +30,13 @@ pipeline = GRNPipeline.from_pretrained(
     device='cpu'
 ).to('cuda')
 
-prompt="The man, of medium build with short, dark, curly hair, stands centered in the frame, wearing a simple white t-shirt that contrasts with the greenery behind him. He holds a dark smartphone, likely a modern model with a triple-lens camera setup, in his right hand, angled slightly toward his body. His gaze is fixed on the screen, and his facial expression shifts subtly\u2014smiling, nodding, and occasionally pursing his lips\u2014as if reacting to content on the phone. The background features a mix of tall green trees and shrubs, with a light blue metal fence running horizontally across the mid-ground, suggesting a garden or rural boundary. The overcast sky diffuses the light, creating soft shadows and a calm, neutral atmosphere. The man\u2019s slight head movements and micro-expressions indicate engagement, possibly reading or responding to a message or video. The composition places him as the focal point, with the natural, slightly blurred background reinforcing his isolation in the moment. The relative stillness of the scene, apart from his subtle gestures, suggests a private, introspective interaction with technology in a serene outdoor setting"
-
+prompt="The video captures a male performer on stage, wearing a black cap, black t-shirt, and a black beaded bracelet on his left wrist, with a tattoo visible on his left forearm. He holds a microphone close to his mouth with his left hand while raising his right arm in a dynamic gesture, suggesting energetic performance. The stage is illuminated with intense blue and purple lighting, creating a moody atmosphere; a focused spotlight beam is visible in the background, adding depth. The performer’s facial expression is intense, eyes closed or squinting, indicating emotional engagement. The camera maintains a close-up, slightly angled shot of his upper body, with minimal movement, emphasizing his actions and expressions. Across the frames, the lighting subtly shifts, enhancing the visual dynamics of the performance without altering the scene’s core composition"
+prompt='一个头戴耳机的男人正在一个工作室里对着麦克风唱歌，偶尔晃动头部'
 # Generate one video
 result = pipeline(
-    prompt=f"{prompt}. masterpiece, high quality.",
+    prompt=f"<T2V>{prompt}. The quality is very high!",
     negative_prompt=negative_prompt,
-    guidance_scale=4.0,
+    guidance_scale=3.0,
     temperature=1.0,
     complexity_aware_Tmin=10,
     complexity_aware_Tmax=50,

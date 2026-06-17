@@ -16,6 +16,13 @@ from videovae.utils.dynamic_resolution_two_pyramid import dynamic_resolution_thw
 CACHE_T = 2
 
 
+def _cache_tensor(x, length=CACHE_T, detach=False):
+    cache = x[:, :, -length:, :, :]
+    if detach:
+        cache = cache.detach()
+    return cache.clone()
+
+
 class CausalConv3d(nn.Conv3d):
     """
     Causal 3d convolusion.
@@ -114,13 +121,22 @@ class Resample(nn.Module):
     def forward(self, x, feat_cache=None, feat_idx=[0]):
         b, c, t, h, w = x.size()
         if self.mode == "upsample3d":
-            if feat_cache is not None:
+            if feat_cache is None:
+                if t > 1:
+                    first_frame = x[:, :, :1, :, :]
+                    x = self.time_conv(x[:, :, 1:, :, :])
+                    x = x.reshape(b, 2, c, t - 1, h, w)
+                    x = torch.stack((x[:, 0, :, :, :, :],
+                                     x[:, 1, :, :, :, :]), 3)
+                    x = x.reshape(b, c, (t - 1) * 2, h, w)
+                    x = torch.cat([first_frame, x], 2)
+            else:
                 idx = feat_idx[0]
                 if feat_cache[idx] is None:
                     feat_cache[idx] = "Rep"
                     feat_idx[0] += 1
                 else:
-                    cache_x = x[:, :, -CACHE_T:, :, :].clone()
+                    cache_x = _cache_tensor(x, detach=self.training)
                     if (cache_x.shape[2] < 2 and feat_cache[idx] is not None and
                             feat_cache[idx] != "Rep"):
                         # cache last frame of last two chunk
@@ -157,13 +173,19 @@ class Resample(nn.Module):
         x = rearrange(x, "(b t) c h w -> b c t h w", t=t) # this 4 lines do spatial down / up sample
 
         if self.mode == "downsample3d":
-            if feat_cache is not None:
+            if feat_cache is None:
+                if t >= 3:
+                    x = torch.cat([x[:, :, :1, :, :], self.time_conv(x)], 2)
+                else:
+                    x = x[:, :, :1, :, :]
+            else:
                 idx = feat_idx[0]
                 if feat_cache[idx] is None:
-                    feat_cache[idx] = x.clone()
+                    feat_cache[idx] = _cache_tensor(
+                        x, length=1, detach=self.training)
                     feat_idx[0] += 1
                 else:
-                    cache_x = x[:, :, -1:, :, :].clone()
+                    cache_x = _cache_tensor(x, length=1, detach=self.training)
                     x = self.time_conv(
                         torch.cat([feat_cache[idx][:, :, -1:, :, :], x], 2))
                     feat_cache[idx] = cache_x
@@ -218,7 +240,7 @@ class ResidualBlock(nn.Module):
         for layer in self.residual:
             if isinstance(layer, CausalConv3d) and feat_cache is not None:
                 idx = feat_idx[0]
-                cache_x = x[:, :, -CACHE_T:, :, :].clone()
+                cache_x = _cache_tensor(x, detach=self.training)
                 if cache_x.shape[2] < 2 and feat_cache[idx] is not None:
                     # cache last frame of last two chunk
                     cache_x = torch.cat(
@@ -255,6 +277,7 @@ class AttentionBlock(nn.Module):
         nn.init.zeros_(self.proj.weight)
 
     def forward(self, x):
+        return x
         identity = x
         b, c, t, h, w = x.size()
         x = rearrange(x, "b c t h w -> (b t) c h w")
@@ -447,7 +470,7 @@ class Down_ResidualBlock(nn.Module):
         self.downsamples = nn.Sequential(*downsamples)
 
     def forward(self, x, feat_cache=None, feat_idx=[0]):
-        x_copy = x.clone()
+        x_copy = x
         for module in self.downsamples:
             x = module(x, feat_cache, feat_idx)
 
@@ -489,7 +512,7 @@ class Up_ResidualBlock(nn.Module):
         self.upsamples = nn.Sequential(*upsamples)
 
     def forward(self, x, feat_cache=None, feat_idx=[0], first_chunk=False):
-        x_main = x.clone()
+        x_main = x
         for module in self.upsamples:
             x_main = module(x_main, feat_cache, feat_idx)
         if self.avg_shortcut is not None:
@@ -560,7 +583,7 @@ class Encoder3d(nn.Module):
 
         if feat_cache is not None:
             idx = feat_idx[0]
-            cache_x = x[:, :, -CACHE_T:, :, :].clone()
+            cache_x = _cache_tensor(x, detach=self.training)
             if cache_x.shape[2] < 2 and feat_cache[idx] is not None:
                 cache_x = torch.cat(
                     [
@@ -594,7 +617,7 @@ class Encoder3d(nn.Module):
         for layer in self.head:
             if isinstance(layer, CausalConv3d) and feat_cache is not None:
                 idx = feat_idx[0]
-                cache_x = x[:, :, -CACHE_T:, :, :].clone()
+                cache_x = _cache_tensor(x, detach=self.training)
                 if cache_x.shape[2] < 2 and feat_cache[idx] is not None:
                     cache_x = torch.cat(
                         [
@@ -672,7 +695,7 @@ class Decoder3d(nn.Module):
     def forward(self, x, feat_cache=None, feat_idx=[0], first_chunk=False):
         if feat_cache is not None:
             idx = feat_idx[0]
-            cache_x = x[:, :, -CACHE_T:, :, :].clone()
+            cache_x = _cache_tensor(x, detach=self.training)
             if cache_x.shape[2] < 2 and feat_cache[idx] is not None:
                 cache_x = torch.cat(
                     [
@@ -699,13 +722,13 @@ class Decoder3d(nn.Module):
             if feat_cache is not None:
                 x = layer(x, feat_cache, feat_idx, first_chunk)
             else:
-                x = layer(x)
+                x = layer(x, first_chunk=first_chunk)
 
         ## head
         for layer in self.head:
             if isinstance(layer, CausalConv3d) and feat_cache is not None:
                 idx = feat_idx[0]
-                cache_x = x[:, :, -CACHE_T:, :, :].clone()
+                cache_x = _cache_tensor(x, detach=self.training)
                 if cache_x.shape[2] < 2 and feat_cache[idx] is not None:
                     cache_x = torch.cat(
                         [
@@ -780,30 +803,33 @@ class WanVAE_(nn.Module):
         x_recon = self.decode(mu, scale)
         return x_recon, mu
 
-    def encode(self, x, scale=None):
+    def encode(self, x, scale=None, use_cache=None):
         self.clear_cache()
         x = patchify(x, patch_size=2)
-        # import pdb; pdb.set_trace()
-        # if self.training:
-        #     out = self.encoder(x)
-        # else:
-        t = x.shape[2]
-        iter_ = 1 + (t - 1) // 4
-        for i in range(iter_):
-            self._enc_conv_idx = [0]
-            if i == 0:
-                out = self.encoder(
-                    x[:, :, :1, :, :],
-                    feat_cache=self._enc_feat_map,
-                    feat_idx=self._enc_conv_idx,
-                )
-            else:
-                out_ = self.encoder(
-                    x[:, :, 1 + 4 * (i - 1):1 + 4 * i, :, :],
-                    feat_cache=self._enc_feat_map,
-                    feat_idx=self._enc_conv_idx,
-                )
-                out = torch.cat([out, out_], 2)
+        if use_cache is None:
+            use_cache = not self.training
+        if use_cache:
+            t = x.shape[2]
+            iter_ = 1 + (t - 1) // 4
+            outs = []
+            for i in range(iter_):
+                self._enc_conv_idx = [0]
+                if i == 0:
+                    out_ = self.encoder(
+                        x[:, :, :1, :, :],
+                        feat_cache=self._enc_feat_map,
+                        feat_idx=self._enc_conv_idx,
+                    )
+                else:
+                    out_ = self.encoder(
+                        x[:, :, 1 + 4 * (i - 1):1 + 4 * i, :, :],
+                        feat_cache=self._enc_feat_map,
+                        feat_idx=self._enc_conv_idx,
+                    )
+                outs.append(out_)
+            out = torch.cat(outs, 2) if len(outs) > 1 else outs[0]
+        else:
+            out = self.encoder(x)
         mu, log_var = self.conv1(out).chunk(2, dim=1)
         if scale is not None:
             if isinstance(scale[0], torch.Tensor):
@@ -812,15 +838,15 @@ class WanVAE_(nn.Module):
             else:
                 mu = (mu - scale[0]) * scale[1]
         self.clear_cache()
-        if self.other_args.encoder_out_type == 'feature_tanh':
+        if self.encoder_out_type == 'feature_tanh':
             mu = torch.tanh(mu)
-        elif self.other_args.encoder_out_type == 'feature':
+        elif self.encoder_out_type == 'feature':
             pass
         else:
-            raise ValueError(f'{self.other_args.encoder_out_type=} is not supported!')
+            raise ValueError(f'{self.encoder_out_type=} is not supported!')
         return mu
 
-    def decode(self, z, scale=None):
+    def decode(self, z, scale=None, use_cache=None, **kwargs):
         self.clear_cache()
         if scale is not None:
             if isinstance(scale[0], torch.Tensor):
@@ -829,18 +855,19 @@ class WanVAE_(nn.Module):
             else:
                 z = z / scale[1] + scale[0]
         x = self.conv2(z)
-        # if self.training:
-        #     out = self.decoder(x)
-        # else:
-        iter_ = z.shape[2]
-        for i in range(iter_):
-            self._conv_idx = [0]
-            if i == 0:
-                out = self.decoder(
-                    x[:, :, i:i + 1, :, :],
-                    feat_cache=self._feat_map,
-                    feat_idx=self._conv_idx,
-                    first_chunk=True,
+        if use_cache is None:
+            use_cache = not self.training
+        if use_cache:
+            iter_ = z.shape[2]
+            outs = []
+            for i in range(iter_):
+                self._conv_idx = [0]
+                if i == 0:
+                    out_ = self.decoder(
+                        x[:, :, i:i + 1, :, :],
+                        feat_cache=self._feat_map,
+                        feat_idx=self._conv_idx,
+                        first_chunk=True,
                 )
             else:
                 out_ = self.decoder(
@@ -848,7 +875,10 @@ class WanVAE_(nn.Module):
                     feat_cache=self._feat_map,
                     feat_idx=self._conv_idx,
                 )
-                out = torch.cat([out, out_], 2)
+                outs.append(out_)
+            out = torch.cat(outs, 2) if len(outs) > 1 else outs[0]
+        else:
+            out = self.decoder(x, first_chunk=True)
         out = unpatchify(out, patch_size=2)
         self.clear_cache()
         return out

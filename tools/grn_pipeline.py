@@ -46,12 +46,12 @@ class GRNPipeline:
             from huggingface_hub import hf_hub_download, snapshot_download
             print(f"download weights from Hugging Face Hub: {hf_repo_id}")
             if task == 'T2I':
-                model_path = hf_hub_download(repo_id=hf_repo_id, filename="GRN_T2I_2B_FSA_94600.pth")
+                model_path = hf_hub_download(repo_id=hf_repo_id, filename="GRN_T2I_2B_FSA_137200.pth")
             elif task == 'T2V':
-                model_path = hf_hub_download(repo_id=hf_repo_id, filename="GRN_T2V_2B.pth")
+                model_path = hf_hub_download(repo_id=hf_repo_id, filename="GRN_T2V_2B_FSA_sft3800_non_ema.pth")
             else:
                 raise ValueError(f"Unknown task: {task}")
-            vae_path = hf_hub_download(repo_id=hf_repo_id, filename="HBQ_tokenizer_64dim_M4.ckpt")
+            vae_path = hf_hub_download(repo_id=hf_repo_id, filename="HBQ_image_video_tokenizer_64dim_M4_20260618.ckpt")
             snapshot_path = snapshot_download(repo_id=hf_repo_id, allow_patterns="umt5-xxl/**")
             text_encoder_ckpt = os.path.join(snapshot_path, "umt5-xxl")
             print(os.listdir(snapshot_path))
