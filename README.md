@@ -8,7 +8,7 @@ colorTo: yellow
 pinned: true
 short_description: "Generative Refinement Networks"
 --- -->
-# GRN: Generative Refinement Networks
+# [ECCV 2026] GRN: Generative Refinement Networks
 
 [![arXiv](https://img.shields.io/badge/arXiv%20paper-2604.13030-b31b1b.svg)](https://arxiv.org/abs/2604.13030)
 [![Homepage](https://img.shields.io/badge/🏠%20Homepage-GRN-green.svg)](https://bytedance.github.io/GRN/)
@@ -20,6 +20,7 @@ short_description: "Generative Refinement Networks"
 ---
 
 ## 🔥 Updates!!
+* June 18, 2026: 🍾 GRN is accepted by ECCV 2026.
 * June 8, 2026: ✈️ The training & fine-tuning code for GRN-T2I and GRN-T2V is released.
 * June 3, 2026: 🍉 A toy image-video dataset is provided for GRN-T2I/GRN-T2V training and fine-tuning.
 * May 23, 2026: 🌺 We release the training and evaluation code for HBQ tokenizer, enjoy~
