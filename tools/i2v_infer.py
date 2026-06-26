@@ -30,7 +30,7 @@ pipeline = GRNPipeline.from_pretrained(
     device='cpu'
 ).to('cuda')
 
-first_frame_path='/mnt/bn/foundation-vision/hanjian.thu123/GRN/assets/i2v_example.jpg'
+first_frame_path='./assets/i2v_example.jpg'
 # support English and Chinese prompt, GRN prefers longer and detailed prompt
 prompt='视频展示了一辆红色敞篷跑车在城市道路中行驶的连续画面。车辆以中等速度前进，车身光滑，反射着黄昏的暖光，黑色轮毂与红色车漆形成对比。驾驶员为男性，专注地操控方向盘，姿态放松。道路两侧排列着高大的棕榈树，背景中可见石质围栏和模糊的建筑轮廓。随着视频推进，一辆白色SUV从后方快速驶过，产生动态模糊，突显跑车的稳定行驶。镜头保持相对固定的侧前方视角，轻微跟随车辆移动，捕捉车身线条与光影变化。整体画面色调温暖，光线柔和，营造出一种优雅而动感的都市驾驶氛围。'
 # Generate one video
