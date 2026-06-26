@@ -113,7 +113,7 @@ def create_demo():
         
         gr.Examples(
             examples=[
-                ["A majestic lion standing on a cliff at sunset", "image", 3.0, 1.0, 42, 1024, 1024],
+                ["A majestic lion standing on a cliff at sunset", "image", 3.0, 1.1, 42, 1024, 1024],
             ],
             inputs=[prompt_input, content_type, guidance_scale, temperature, seed, width, height],
             cache_examples=False

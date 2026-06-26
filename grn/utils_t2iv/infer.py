@@ -66,6 +66,7 @@ def gen_one_example(
     return_summed_code_only=False,
     class_token_id=0,
     first_frame_condition=False,
+    first_frame_path=None,
 ):
     sstt = time.time()
     if not isinstance(cfg_list, list):
@@ -98,6 +99,7 @@ def gen_one_example(
             return_summed_code_only=return_summed_code_only,
             class_token_id=class_token_id,
             first_frame_condition=first_frame_condition,
+            first_frame_path=first_frame_path,
         )
         _, pred_multi_scale_bit_labels, img_list = out
             

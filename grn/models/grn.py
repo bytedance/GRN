@@ -5,6 +5,8 @@ from contextlib import nullcontext
 from functools import partial
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import cv2
+from PIL import Image
 import numpy as np
 import torch
 import torch.nn as nn
@@ -162,7 +164,6 @@ class GRN(nn.Module):
         norm_eps: float = 1e-6,
         block_chunks: int = 1,
         checkpointing: Optional[str] = None,
-        pad_to_multiplier: int = 0,
         use_flex_attn: bool = False,
         num_of_label_value: int = 2,
         rope2d_normalized_by_hw: int = 0,
@@ -240,8 +241,6 @@ class GRN(nn.Module):
                 nn.Linear(self.scale_or_time_dim, self.embed_dim), nn.SiLU(), nn.Linear(self.embed_dim, self.embed_dim),
             )
             self.scale_or_time_projection = nn.Sequential(nn.SiLU(), nn.Linear(self.embed_dim, self.embed_dim * 6))
-
-        tmp_h_div_w_template = self.train_h_div_w_list[0]
 
         # RoPE grid initialization
         with torch.amp.autocast('cuda', dtype=torch.float32):
@@ -487,6 +486,17 @@ class GRN(nn.Module):
         last_stage = self.word_embed(last_stage) # norm0_ve is Identity
         return last_stage
     
+    def encode_first_frame(self, vae, image_path, tgt_h, tgt_w):
+        from grn.utils_t2iv.infer import transform
+        from grn.utils_t2iv.hbq_util_t2iv import raw_feature2bit_label
+        raw_video = [cv2.imread(image_path)[:,:,::-1]] # bgr
+        img_T3HW = [transform(Image.fromarray(frame).convert("RGB"), tgt_h, tgt_w) for frame in raw_video] # bgr to rgb
+        img_T3HW = torch.stack(img_T3HW, 0) # [t,3,h,w]
+        img_bcthw = img_T3HW.permute(1,0,2,3).unsqueeze(0) # [c,t,h,w] -> [b,c,t,h,w]
+        raw_features, _, _ = vae.encode_for_raw_features(img_bcthw.to('cuda'), scale_schedule=None, slice=True)
+        labels = raw_feature2bit_label(raw_features[0], hbq_round=self.other_args.hbq_round) # [B, hbq_round * d, t, h, w]
+        return labels
+
     @torch.no_grad()
     def autoregressive_infer(
         self,
@@ -501,8 +511,8 @@ class GRN(nn.Module):
         args: Optional[Any] = None,
         get_visual_rope_embeds: Optional[Any] = None,
         noise_list: Optional[List[torch.Tensor]] = None,
-        uncond_class_token_id: int = 1000,
         first_frame_condition: bool = False,
+        first_frame_path: Optional[str] = None,
         **kwargs: Any,
     ):
         """Autoregressive inference loop for the GRN model."""
@@ -553,7 +563,7 @@ class GRN(nn.Module):
             absolute_gt_labels = noise_list[0].to('cuda').permute(0,2,3,4,1) # [B,d,t,h,w] -> [B,t,h,w,d]
         assert len(scale_schedule) == 1
         if first_frame_condition:
-            first_frame_labels = noise_list[0][:,:,:1] # [B,d,1,h,w]
+            first_frame_labels = self.encode_first_frame(vae, first_frame_path, ph*16, pw*16)[:,:,:1] # [B,d,1,h,w]
             first_frame_tokens_cond = self.embeds_codes2input(multiclass_labels2onehot_input(first_frame_labels, classes))
             fist_frame_rope_cache = get_visual_rope_embeds(self.rope2d_freqs_grid, (1, ph, pw), device, args.mapped_h_div_w_template, t_offset=0)
             visual_rope_cache = torch.cat((visual_rope_cache, fist_frame_rope_cache), dim=4)
@@ -749,6 +759,21 @@ def GRN2b(depth: int = 28, block_chunks: int = 7, embed_dim: int = 2304, num_hea
         num_heads=num_heads,
         num_key_value_heads=num_key_value_heads,
         mlp_ratio=3.55,
+        drop_path_rate=drop_path_rate,
+        **{k: v for k, v in kwargs.items() if k not in TIMM_KEYS}
+    )
+
+@register_model
+def GRN8b(depth: int = 36, block_chunks: int = 6, embed_dim: int = 4096, num_heads: int = 32, num_key_value_heads: int = 8, mlp_ratio: float = 4, drop_path_rate: float = 0.0, **kwargs: Any) -> GRN: 
+    return GRN(
+        arch='qwen',
+        qwen_qkvo_bias=False,
+        depth=depth,
+        block_chunks=block_chunks,
+        embed_dim=embed_dim,
+        num_heads=num_heads,
+        num_key_value_heads=num_key_value_heads,
+        mlp_ratio=mlp_ratio,
         drop_path_rate=drop_path_rate,
         **{k: v for k, v in kwargs.items() if k not in TIMM_KEYS}
     )

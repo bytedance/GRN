@@ -29,5 +29,7 @@ tmp
 .git_bk
 demo
 .git_hf_space
+.git_github/
 *.pyc
 tmp
+*.png

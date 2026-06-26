@@ -47,11 +47,13 @@ class GRNPipeline:
             print(f"download weights from Hugging Face Hub: {hf_repo_id}")
             if task == 'T2I':
                 model_path = hf_hub_download(repo_id=hf_repo_id, filename="GRN_T2I_2B_FSA_137200.pth")
-            elif task == 'T2V':
+            elif task == 'T2V' and model == 'GRN2b':
                 model_path = hf_hub_download(repo_id=hf_repo_id, filename="GRN_T2V_2B_FSA_sft3800_non_ema.pth")
+            elif task == 'T2V' and model == 'GRN8b':
+                model_path = hf_hub_download(repo_id=hf_repo_id, filename="GRN_T2V_TITAN_FSA_sft10600_ema.pth")
             else:
                 raise ValueError(f"Unknown task: {task}")
-            vae_path = hf_hub_download(repo_id=hf_repo_id, filename="HBQ_image_video_tokenizer_64dim_M4_20260618.ckpt")
+            vae_path = hf_hub_download(repo_id=hf_repo_id, filename="HBQ_image_video_tokenizer_64dim_M4_20260626.ckpt")
             snapshot_path = snapshot_download(repo_id=hf_repo_id, allow_patterns="umt5-xxl/**")
             text_encoder_ckpt = os.path.join(snapshot_path, "umt5-xxl")
             print(os.listdir(snapshot_path))
@@ -165,6 +167,7 @@ class GRNPipeline:
         complexity_aware_b = 50,
         complexity_aware_wp = 5,
         first_frame_condition = False,
+        first_frame_path = '',
         snr_shift = 1.,
         h_div_w=1.,
         duration=2.,
@@ -216,7 +219,7 @@ class GRNPipeline:
             cfg_list=self.args.cfg_val, tau_list=self.args.tau, scale_schedule=scale_schedule,
             cfg_insertion_layer=[self.args.cfg_insertion_layer], vae_latent_dim=self.args.vae_latent_dim,
             args=self.args, get_visual_rope_embeds=self.get_visual_rope_embeds,
-            noise_list=None, first_frame_condition=first_frame_condition,
+            noise_list=None, first_frame_condition=first_frame_condition, first_frame_path=first_frame_path,
         )
         
         if len(generated_image.shape) == 3:
