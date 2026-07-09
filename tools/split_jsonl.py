@@ -97,8 +97,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--jsonl_folder_list', type=str, default='', nargs='+', help='patha pathb pathc')
     parser.add_argument('--save_dir', type=str, default='')
-    parser.add_argument('--chunk_size', type=int, default=1000)
-    parser.add_argument('--bucket_size', type=int, default=1000)
+    parser.add_argument('--chunk_size', type=int, default=100)
+    parser.add_argument('--bucket_size', type=int, default=10000)
     parser.add_argument('--worker', type=int, default=128)
     args = parser.parse_args()
 

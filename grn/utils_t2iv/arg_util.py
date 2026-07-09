@@ -64,7 +64,6 @@ class Args(Tap):
     log_freq: int = 50                  # log frequency in the stdout
     tclip: float = 2.                   # <=0 for not grad clip GPT; >100 for per-param clip (%= 100 automatically)
     # data
-    pn: str = ''                        # pixel nums, choose from 0.06M, 0.25M, 1M
     workers: int = 0                    # num workers; 0: auto, -1: don't use multiprocessing in DataLoader
     norm_eps: float = 1e-6              # norm eps
     tlen: int = 512                     # truncate text embedding to this length
@@ -72,7 +71,7 @@ class Args(Tap):
     num_of_label_value: int = 2         # num_of_label_value, =2 means bitwise label, =0 means index-wise label, others means fsq, never set to 1
     enable_dynamic_length_prompt: int = 0 # enable dynamic length prompt during training
     save_model_iters_freq: int = 1000   # save model iter freq
-    reweight_loss_by_scale: int = 0     # reweight loss by scale
+    reweight_loss_by_scale: float = 0     # reweight loss by scale
     vae_latent_dim: int = 1                   # here 16/32/64 is bsq vae of different quant bits
     model_init_device: str = 'cuda'     # model_init_device
     fsdp_init_device: str = 'cuda'     # model_init_device
@@ -93,7 +92,14 @@ class Args(Tap):
     cached_video_frames: int = 81       # load cache files' video_frames, set to 81 by default
     rope_type: str = '3d'               # rope type, choose from ['2d', '3d', '4d'], default set to '3d'
     loop_data_per_epoch: int = 0
-
+    meta_folders: str = ''
+    meta_folder_repeats: str = ''
+    meta_folder_identifiers: str = ''
+    pn_list: str = ''
+    pn_probs: str = ''
+    i2v_ratio: float = 0.
+    dense_ratio4seqpack: float = 1.
+        
     # RL Arguments
     pair_input: int = 0 # dpo needs pair_input=1
     rl_with_ref_model: int = 1
@@ -143,7 +149,7 @@ class Args(Tap):
     alpha: float = 0.0
     refine_mode: str = ''
     log_norm_mean: float = 0
-    log_norm_sigma: Literal[-1.0, 0.2, 0.4, 0.8, 1.0] = -1. # < 0 mean disable log-norm sampling
+    log_norm_sigma: float = -1. # < 0 mean disable log-norm sampling
     gradient_accumulation: int = 1
     # would be automatically set in runtime
     cmd: str = ' '.join(a.replace('--exp_name=', '').replace('--exp_name ', '') for a in sys.argv[7:])  # [automatically set; don't specify this]

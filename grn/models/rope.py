@@ -73,7 +73,6 @@ def precompute_rope2d_freqs_grid(dim, dynamic_resolution_h_w, rope2d_normalized_
 def precompute_rope3d_freqs_grid(
         dim, 
         rope2d_normalized_by_hw, 
-        pad_to_multiplier=1, 
         max_frames=128, 
         max_height=2048 // 8, 
         max_width=2048 // 8, 
@@ -121,7 +120,6 @@ def precompute_rope3d_freqs_grid(
 def precompute_rope4d_freqs_grid(
         dim, 
         rope2d_normalized_by_hw, 
-        pad_to_multiplier=1, 
         max_scales=128, 
         max_frames=128, 
         max_height=2048 // 8, 

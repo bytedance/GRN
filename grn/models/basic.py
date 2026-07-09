@@ -14,12 +14,6 @@ from grn.models.rope import apply_rotary_emb
 from grn.utils_t2iv.sequence_parallel import sp_all_to_all, SequenceParallelManager as sp_manager
 
 try:
-    from flash_attn.cute import flash_attn_varlen_func
-except:
-    from flash_attn import flash_attn_varlen_func
-                
-# Import flash_attn's fused ops
-try:
     from flash_attn.ops.rms_norm import rms_norm as rms_norm_impl
 except ImportError:
     def rms_norm_impl(x, weight, epsilon):
@@ -94,16 +88,17 @@ class Qwen3MLP(nn.Module):
         down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
         return down_proj
 
+
 def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
     """
     This is the equivalent of torch.repeat_interleave(x, dim=1, repeats=n_rep). The hidden states go from (batch,
     num_key_value_heads, seqlen, head_dim) to (batch, num_attention_heads, seqlen, head_dim)
     """
-    batch, num_key_value_heads, slen, head_dim = hidden_states.shape
+    batch, slen, num_key_value_heads, head_dim = hidden_states.shape
     if n_rep == 1:
         return hidden_states
-    hidden_states = hidden_states[:, :, None, :, :].expand(batch, num_key_value_heads, n_rep, slen, head_dim)
-    return hidden_states.reshape(batch, num_key_value_heads * n_rep, slen, head_dim)
+    hidden_states = hidden_states[:, :, :, None, :].expand(batch, slen, num_key_value_heads, n_rep, head_dim)
+    return hidden_states.reshape(batch, slen, num_key_value_heads * n_rep, head_dim)
 
 class SelfAttention(nn.Module):
     def __init__(
@@ -130,6 +125,7 @@ class SelfAttention(nn.Module):
         self.q_norm = FastRMSNorm(self.head_dim)
         self.k_norm = FastRMSNorm(self.head_dim)
         self.num_key_value_groups = self.num_heads // self.num_key_value_heads
+        self.scale = self.head_dim**-0.5
         
         self.caching = False    # kv caching: only used during inference
         self.cached_k = {}    # kv caching: only used during inference
@@ -145,15 +141,15 @@ class SelfAttention(nn.Module):
         self.cached_split_cond_uncond = {}
 
     # NOTE: attn_bias_or_two_vector is None during inference
-    def forward(self, x, attn_bias_or_two_vector: Union[torch.Tensor, Tuple[torch.IntTensor, torch.IntTensor]], attn_fn=None, rope2d_freqs_grid=[], scale_ind=0, context_info=None, last_diffusion_step=True, ref_text_scale_inds=[], use_cfg=False, split_cond_uncond=[], **kwargs):
+    def forward(self, x, cu_seqlens, max_seqlen, attn_bias_or_two_vector: Union[torch.Tensor, Tuple[torch.IntTensor, torch.IntTensor]], attn_fn=None, rope2d_freqs_grid=[], scale_ind=0, context_info=None, last_diffusion_step=True, ref_text_scale_inds=[], use_cfg=False, split_cond_uncond=[], **kwargs):
         # x: fp32
         B, L, C = x.shape
         hidden_states = x
         input_shape = hidden_states.shape[:-1]
         hidden_shape = (*input_shape, -1, self.head_dim)
-        query_states = self.q_norm(self.q_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
-        key_states = self.k_norm(self.k_proj(hidden_states).view(hidden_shape)).transpose(1, 2) # batch, num_key_value_heads, slen, head_dim
-        value_states = self.v_proj(hidden_states).view(hidden_shape).transpose(1, 2) # batch, num_key_value_heads, slen, head_dim
+        query_states = self.q_norm(self.q_proj(hidden_states).view(hidden_shape)).contiguous()# batch, slen, heads, head_dim
+        key_states = self.k_norm(self.k_proj(hidden_states).view(hidden_shape)).contiguous() # batch, slen, num_key_value_heads, head_dim
+        value_states = self.v_proj(hidden_states).view(hidden_shape).contiguous() # batch, slen, num_key_value_heads, head_dim
 
         if sp_manager.sp_on():
             # Headnum need to be sharded and L needs to be gathered
@@ -167,68 +163,26 @@ class SelfAttention(nn.Module):
             value_states = sp_all_to_all(value_states, sdim, gdim)
 
         query_states, key_states = apply_rotary_emb(query_states, key_states, rope2d_freqs_grid)
-        if self.caching:    # kv caching: only used during inference
-            if last_diffusion_step:
-                self.cached_k[scale_ind] = key_states
-                self.cached_v[scale_ind] = value_states
-                self.cached_split_cond_uncond[scale_ind] = split_cond_uncond
-            if isinstance(scale_ind, int):
-                ref_scale_inds = context_info[scale_ind]['ref_sids'] + ref_text_scale_inds
-                key_states = [self.cached_k[ind] for ind in ref_scale_inds] + [key_states]
-                value_states = [self.cached_v[ind] for ind in ref_scale_inds] + [value_states]
-                split_cond_uncond_list = [self.cached_split_cond_uncond[ind] for ind in ref_scale_inds] + [split_cond_uncond]
-            else:
-                key_states = [key_states]
-                value_states = [value_states]
-                split_cond_uncond_list = [split_cond_uncond]
-            
-            key_states, cu_seqlens_k = merge_states(key_states, split_cond_uncond_list, use_cfg)
-            value_states, _ = merge_states(value_states, split_cond_uncond_list, use_cfg)
-
-            key_states = torch.cat(key_states, dim=2)
-            value_states = torch.cat(value_states, dim=2)
-
-            # delete deprecated cached kv to save gpu memory
-            if isinstance(scale_ind, int):
-                ref_scale_2_last_use_scale = [-1 for _ in range(len(context_info))]
-                for si in range(len(context_info)):
-                    for ref_si in context_info[si]['ref_sids']:
-                        ref_scale_2_last_use_scale[ref_si] = si
-                for ref_si in range(scale_ind):
-                    if (ref_scale_2_last_use_scale[ref_si] < scale_ind) and (self.cached_k[ref_si] is not None):
-                        tmpk, tmpv = self.cached_k[ref_si], self.cached_v[ref_si]
-                        self.cached_k[ref_si], self.cached_v[ref_si] = None, None
-                        del tmpk, tmpv
-
         key_states = repeat_kv(key_states, self.num_key_value_groups)
         value_states = repeat_kv(value_states, self.num_key_value_groups)
-        scale = self.head_dim**-0.5
-        if self.use_flex_attn and attn_fn is not None:
-            attn_output = attn_fn(query_states.to(value_states.dtype), key_states.to(value_states.dtype), value_states, scale=scale).transpose(1, 2).reshape(B, L, C)
+
+        if attn_bias_or_two_vector is None:
+            # fa4, flash_attn_func input/output should be (batch_size, seqlen, nheads, headdim)
+            from flash_attn.cute import flash_attn_varlen_func
+            attn_output = flash_attn_varlen_func(
+                q = query_states.squeeze(0),
+                k = key_states.squeeze(0),
+                v = value_states.squeeze(0),
+                cu_seqlens_q=cu_seqlens,
+                cu_seqlens_k=cu_seqlens,
+                max_seqlen_q=max_seqlen,
+                max_seqlen_k=max_seqlen,
+                softmax_scale=self.scale,
+            )
+            attn_output = attn_output[0].reshape(B, L, C).contiguous()
         else:
-            if attn_bias_or_two_vector is None:
-
-                # fa2, flash_attn_func input/output should be (batch_size, seqlen, nheads, headdim)
-                attn_output = flash_attn_varlen_func(
-                    q = query_states.permute([0,2,1,3]).contiguous().to(torch.bfloat16).squeeze(0),
-                    k = key_states.permute([0,2,1,3]).contiguous().to(torch.bfloat16).squeeze(0),
-                    v = value_states.permute([0,2,1,3]).contiguous().to(torch.bfloat16).squeeze(0),
-                    cu_seqlens_q = torch.tensor([0] + split_cond_uncond, device=query_states.device).cumsum(-1).to(torch.int32),
-                    cu_seqlens_k = torch.tensor([0] + cu_seqlens_k, device=query_states.device).cumsum(-1).to(torch.int32),
-                    max_seqlen_q = max(split_cond_uncond),
-                    max_seqlen_k = max(cu_seqlens_k),
-                    softmax_scale=scale,
-                )
-                attn_output = attn_output.reshape(B, L, C).contiguous()
-                # attn_output = flash_attn_func(query_states.permute([0,2,1,3]).to(torch.bfloat16), key_states.permute([0,2,1,3]).to(torch.bfloat16), value_states.permute([0,2,1,3]).to(torch.bfloat16), softmax_scale=scale)
-            else:
-                # slow attn
-                attn_output = slow_attn(query=query_states, key=key_states, value=value_states, scale=scale, attn_mask=attn_bias_or_two_vector, dropout_p=0).transpose(1, 2).reshape(B, L, C)
-
-            # fa3, flash_attn_func input/output should be (batch_size, seqlen, nheads, headdim)
-            # from flash_attn_interface import flash_attn_qkvpacked_func, flash_attn_func
-            # attn_output = flash_attn_func(query_states.permute([0,2,1,3]).to(torch.bfloat16), key_states.permute([0,2,1,3]).to(torch.bfloat16), value_states.permute([0,2,1,3]).to(torch.bfloat16), softmax_scale=scale)
-            # attn_output = attn_output[0].reshape(B, L, C)
+            # slow attn
+            attn_output = slow_attn(query=query_states.transpose(1, 2), key=key_states.transpose(1, 2), value=value_states.transpose(1, 2), scale=self.scale, attn_mask=attn_bias_or_two_vector, dropout_p=0).transpose(1, 2).reshape(B, L, C)
 
         if sp_manager.sp_on():
             # [B, raw_L, C/sp] --> [B, raw_L/sp, C]
@@ -263,7 +217,7 @@ class SelfAttnBlock(nn.Module):
             self.post_attention_layernorm = FastRMSNorm(embed_dim)
         
     # NOTE: attn_bias_or_two_vector is None during inference
-    def forward(self, x, e0, attn_bias_or_two_vector, attn_fn=None, rope2d_freqs_grid=[], scale_ind=0, context_info=None, last_diffusion_step=True, ref_text_scale_inds=[], use_cfg=False, split_cond_uncond=[], **kwargs):
+    def forward(self, x, cu_seqlens, max_seqlen, e0, attn_bias_or_two_vector, attn_fn=None, rope2d_freqs_grid=[], scale_ind=0, context_info=None, last_diffusion_step=True, ref_text_scale_inds=[], use_cfg=False, split_cond_uncond=[], **kwargs):
         # x: [B,L,C]
         # e0: [B, L, 6, C]
         if self.use_ada_layer_norm:
@@ -274,7 +228,7 @@ class SelfAttnBlock(nn.Module):
             residual = x
             hidden_states = x
             hidden_states = self.input_layernorm(hidden_states).float() * (1 + e[1].squeeze(2)) + e[0].squeeze(2)
-            hidden_states = self.attn(hidden_states, attn_bias_or_two_vector, attn_fn, rope2d_freqs_grid, scale_ind, context_info, last_diffusion_step, ref_text_scale_inds, use_cfg, split_cond_uncond, **kwargs)
+            hidden_states = self.attn(hidden_states, cu_seqlens, max_seqlen, attn_bias_or_two_vector, attn_fn, rope2d_freqs_grid, scale_ind, context_info, last_diffusion_step, ref_text_scale_inds, use_cfg, split_cond_uncond, **kwargs)
             with torch.amp.autocast('cuda', dtype=torch.float32):
                 hidden_states = residual + hidden_states * e[2].squeeze(2)
             # Fully Connected
@@ -287,7 +241,7 @@ class SelfAttnBlock(nn.Module):
             residual = x
             hidden_states = x
             hidden_states = self.input_layernorm(hidden_states)
-            hidden_states = self.attn(hidden_states, attn_bias_or_two_vector, attn_fn, rope2d_freqs_grid, scale_ind, context_info, last_diffusion_step, ref_text_scale_inds, use_cfg, split_cond_uncond, **kwargs)
+            hidden_states = self.attn(hidden_states, cu_seqlens, max_seqlen, attn_bias_or_two_vector, attn_fn, rope2d_freqs_grid, scale_ind, context_info, last_diffusion_step, ref_text_scale_inds, use_cfg, split_cond_uncond, **kwargs)
             hidden_states = residual + hidden_states
             # Fully Connected
             residual = hidden_states

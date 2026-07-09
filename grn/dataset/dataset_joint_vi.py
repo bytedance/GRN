@@ -29,7 +29,7 @@ from PIL import Image
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 from grn.schedules.dynamic_resolution import get_dynamic_resolution_meta
-from grn.utils.video_decoder import EncodedVideoDecord, EncodedVideoOpencv
+from grn.utils.video_decoder import EncodedVideoDecord
 from grn.utils.compress_tokens import load_packed_tensor
 from transformers import AutoTokenizer
 
@@ -70,14 +70,11 @@ class VideoReaderWrapper(VideoReader):
         self.seek(0)
         return frames
 
-
-def local_or_download(info, down_size_limit=140, tmp_dir='/dev/shm/tmp'):
-    return info["video_path"]
-
 class JointViDataset(Dataset):
     def __init__(
         self,
-        meta_folder: str = '',
+        meta_folders: str = '',
+        meta_folder_repeats: str = '',
         buffersize: int = 1000000 * 300,
         seed: int = 0,
         pn: str = '',
@@ -94,8 +91,13 @@ class JointViDataset(Dataset):
         other_args=None,
         **kwargs,
     ):
-        self.meta_folder = meta_folder
-        self.pn = pn
+        self.meta_folders = json.loads(meta_folders)
+        self.meta_folder_repeats = json.loads(meta_folder_repeats)
+        self.meta_folder_identifiers = json.loads(other_args.meta_folder_identifiers)
+        self.pn_list = json.loads(other_args.pn_list)
+        self.pn_probs = json.loads(other_args.pn_probs)
+        assert len(self.meta_folders) == len(self.meta_folder_repeats), f'{len(self.meta_folders)} != {len(self.meta_folder_repeats)}'
+        assert len(self.meta_folders) == len(self.meta_folder_identifiers), f'{len(self.meta_folders)} != {len(self.meta_folder_identifiers)}'
         self.verbose = verbose
         self.buffer_size = buffersize
         self.num_replicas = num_replicas
@@ -108,7 +110,7 @@ class JointViDataset(Dataset):
         self.global_workers = self.num_replicas * self.dataloader_workers
         self.seed = seed
         self.text_tokenizer = other_args.text_tokenizer
-        self.feature_extraction = other_args.cache_check_mode < 0 # no sequence packing, for feature extraction
+        self.feature_extraction = other_args.only_images4extract_feats # < 0 # no sequence packing, for feature extraction
         self.epoch_generator = None
         self.epoch_rank_generator = None
         self.other_args = other_args
@@ -132,7 +134,7 @@ class JointViDataset(Dataset):
             ])
         else:
             self.c2i_transform = None
-        self.print(f"{self.rank=} dataset {self.seed=}, {self.h_div_w_templates=} {self.c2i=} {self.min_training_duration=} {self.max_training_duration=}, cache_check_mode={self.other_args.cache_check_mode}")
+        self.print(f"{self.rank=} dataset {self.seed=}, {self.h_div_w_templates=} {self.min_training_duration=} {self.max_training_duration=}, cache_check_mode={self.other_args.cache_check_mode}")
         self.token_cache_dir = other_args.token_cache_dir
         self.use_vae_token_cache = other_args.use_vae_token_cache
         self.allow_online_vae_feature_extraction = other_args.allow_online_vae_feature_extraction
@@ -140,7 +142,6 @@ class JointViDataset(Dataset):
         self.max_video_frames = other_args.video_frames
         self.cached_video_frames = other_args.cached_video_frames # cached max video frames
         self.down_size_limit = other_args.down_size_limit
-        self.addition_pn_list = json.loads(other_args.addition_pn_list)
         self.video_caption_type = other_args.video_caption_type
         self.train_max_token_len = other_args.train_max_token_len
         self.duration_resolution = other_args.duration_resolution
@@ -170,14 +171,21 @@ class JointViDataset(Dataset):
         return lens
         
     def get_video_caption(self, meta, mapped_duration):
-        caption_type = 'tarsier2_caption'
-        if ('MiniCPM_V_2_6_caption' in meta) and meta['MiniCPM_V_2_6_caption']:
-            caption_type = self.epoch_rank_generator.choice(['tarsier2_caption', 'MiniCPM_V_2_6_caption'])
-        caption = meta[caption_type]
+        if 'tarsier2_caption' not in meta:
+            caption = self.epoch_rank_generator.choice(meta['caption'])['content']
+        else:
+            caption_type = 'tarsier2_caption'
+            if ('MiniCPM_V_2_6_caption' in meta) and meta['MiniCPM_V_2_6_caption']:
+                caption_type = self.epoch_rank_generator.choice(['tarsier2_caption', 'MiniCPM_V_2_6_caption'])
+            caption = meta[caption_type]
         if self.enable_dynamic_length_prompt and (self.epoch_rank_generator.random() < self.other_args.short_cap_prob):
             caption = self.random_drop_sentences(caption, min_sentences=2)
         if 'quality_prompt' in meta:
             caption = caption + ' ' + meta['quality_prompt']
+        if meta['first_frame_condition']:
+            caption = '<I2V>' + caption
+        else:
+            caption = '<T2V>' + caption
         assert caption
         return caption
     
@@ -191,11 +199,37 @@ class JointViDataset(Dataset):
                     caption = meta['text']
                 elif ('InternVL' in meta['long_caption_type']):
                     caption = self.random_drop_sentences(meta['long_caption'], min_sentences=2)
+        caption = '<T2I>' + caption
         assert caption
         return caption
 
+    def sample_pn(self, meta, pn_list, pn_probs):
+        if ('height' in meta) and ('width' in meta):
+            real_pn = meta['height'] * meta['width'] / 1000000
+            valid_pn_list, valid_pn_probs = [], []
+            for pn, pn_prob in zip(pn_list, pn_probs):
+                if real_pn > 0.7 * float(pn[:-1]):
+                    valid_pn_list.append(pn)
+                    valid_pn_probs.append(pn_prob)
+            if not len(valid_pn_list):
+                valid_pn_list = pn_list[:1]
+                valid_pn_probs = pn_probs[:1]
+        else:
+            valid_pn_list = pn_list
+            valid_pn_probs = pn_probs
+        return self.epoch_rank_generator.choice(valid_pn_list, p=valid_pn_probs)
+
     def get_mapped_duration2metas(self):
-        part_filepaths = sorted(glob.glob(osp.join(self.meta_folder, '*/*.jsonl')))
+        part_filepaths = []
+        part_file2identifier = {}
+        for meta_folder, meta_folder_repeat, meta_folder_identifier in zip(self.meta_folders, self.meta_folder_repeats, self.meta_folder_identifiers):
+            tmp_part_filepaths = sorted(glob.glob(osp.join(meta_folder, '*/*.jsonl')))
+            self.epoch_generator.shuffle(tmp_part_filepaths)
+            if meta_folder_repeat > 1:
+                tmp_part_filepaths = tmp_part_filepaths * int(np.ceil(meta_folder_repeat))
+            tmp_part_filepaths = tmp_part_filepaths[:int(len(tmp_part_filepaths)*meta_folder_repeat)]
+            for file in tmp_part_filepaths: part_file2identifier[file] = meta_folder_identifier
+            part_filepaths.extend(tmp_part_filepaths)
         self.epoch_generator.shuffle(part_filepaths)
         self.print(f'{self.rank=} jsonls sample: {part_filepaths[:4]}')
         if self.num_replicas > 1:
@@ -207,11 +241,12 @@ class JointViDataset(Dataset):
         stop_read = False
         rough_h_div_w = self.h_div_w_templates[np.argmin(np.abs((9/16-self.h_div_w_templates)))]
         for part_filepath in part_filepaths:
+            file_quality_prompt = part_file2identifier[part_filepath]
             if stop_read:
                 break
             pbar.update(1)
             try:
-                with open(part_filepath, 'r') as f:
+                with open(part_filepath, encoding='utf-8') as f:
                     lines = f.readlines()
             except Exception as e:
                 print(f'{part_filepath=} Error: {e}')
@@ -225,13 +260,19 @@ class JointViDataset(Dataset):
                     corrupt += 1
                     print(e, corrupt, total, corrupt/total)
                     continue
+                if file_quality_prompt: # override quality prompt
+                    meta['quality_prompt'] = file_quality_prompt
                 if ('height' in meta) and ('width' in meta):
                     cur_h_div_w_template = self.h_div_w_templates[np.argmin(np.abs((meta['height']/meta['width']-self.h_div_w_templates)))]
                 else:
                     cur_h_div_w_template = rough_h_div_w
                 if 'h_div_w' in meta:
                     del meta['h_div_w']
+                meta['first_frame_condition'] = False
+                meta['pn'] = self.sample_pn(meta, self.pn_list, self.pn_probs)
                 if 'video_path' in meta:
+                    if self.epoch_rank_generator.random() < self.other_args.i2v_ratio:
+                        meta['first_frame_condition'] = True
                     begin_frame_id, end_frame_id, fps = meta['begin_frame_id'], meta['end_frame_id'], meta['fps']
                     real_duration = (end_frame_id - begin_frame_id) / fps
                     mapped_duration = int(np.round(real_duration / self.duration_resolution)) * self.duration_resolution
@@ -251,11 +292,11 @@ class JointViDataset(Dataset):
                         meta['caption'] = [self.get_video_caption(meta, mapped_duration)]
                     sample_frames = int(mapped_duration * self.video_fps + 1)
                     pt = (sample_frames-1) // self.temporal_compress_rate + 1
-                    scale_schedule = self.dynamic_resolution_h_w[cur_h_div_w_template][self.pn]['pt2scale_schedule'][pt]
+                    scale_schedule = self.dynamic_resolution_h_w[cur_h_div_w_template][meta['pn']]['pt2scale_schedule'][pt]
                     meta['sample_frames'] = sample_frames
                 elif 'image_path' in meta:
                     mapped_duration = -1
-                    scale_schedule = self.dynamic_resolution_h_w[cur_h_div_w_template][self.pn]['pt2scale_schedule'][1]
+                    scale_schedule = self.dynamic_resolution_h_w[cur_h_div_w_template][meta['pn']]['pt2scale_schedule'][1]
                     meta['caption'] = [self.get_image_caption(meta)]
                 # random set caption to "" for classifier-free guidance
                 # refer to: https://github.com/PixArt-alpha/PixArt-alpha/blob/master/train_scripts/train_diffusers.py#L67
@@ -272,7 +313,7 @@ class JointViDataset(Dataset):
                 for scale_ind, scale in enumerate(scale_schedule):
                     if self.epoch_rank_generator.random() < self.other_args.video_scale_probs[scale_ind]:
                         preserve_scale_inds[scale_ind] = True
-                        tokens_this_scale = np.array(scale).prod(-1) + self.other_args.add_scale_token + self.other_args.add_class_token
+                        tokens_this_scale = np.array(scale).prod(-1) + self.other_args.add_scale_token
                         cum_visual_tokens.append(tokens_this_scale)
                 cum_visual_tokens = np.array(cum_visual_tokens).cumsum()
                 meta['cum_text_visual_tokens'] = cum_visual_tokens
@@ -315,8 +356,8 @@ class JointViDataset(Dataset):
 
     def append_text_tokens(self, metas, skip_count_text_token=False, bucket_size=100):
         t1 = time.time()
-        max_text_visual_tokens = -1
         pbar = tqdm.tqdm(total=len(metas) // bucket_size + 1, desc='append text tokens')
+        valid_metas = []
         for bucket_id in range(len(metas) // bucket_size + 1):
             pbar.update(1)
             start = bucket_id * bucket_size
@@ -341,47 +382,57 @@ class JointViDataset(Dataset):
                 metas[i]['text_tokens'] = text_tokens
                 metas[i]['cum_text_visual_tokens'] = metas[i]['cum_text_visual_tokens'] + metas[i]['text_tokens']
                 metas[i]['text_visual_tokens'] = metas[i]['cum_text_visual_tokens'][-1]
-                max_text_visual_tokens = max(max_text_visual_tokens, metas[i]['text_visual_tokens'])
+                if metas[i]['text_visual_tokens'] <= self.train_max_token_len * self.other_args.dense_ratio4seqpack:
+                    valid_metas.append(metas[i])
         t2 = time.time()
         print(f'append text tokens: {t2-t1:.1f}s')
-        return metas
+        return valid_metas
 
     def exists_cache_file(self, meta):
+        pn = meta['pn']
         if 'image_path' in meta:
-            return osp.exists(self.get_image_cache_file(meta['image_path']))
+            return osp.exists(self.get_image_cache_file(meta['image_path'], pn))
         else:
             if '/vdataset/clip' in meta['video_path']: # clip
-                cache_file = self.get_video_cache_file(meta['video_path'], 0, meta['end_frame_id']-meta['begin_frame_id'], self.video_fps)
+                cache_file = self.get_video_cache_file(meta['video_path'], 0, meta['end_frame_id']-meta['begin_frame_id'], self.video_fps, pn)
             else:
-                cache_file = self.get_video_cache_file(meta['video_path'], meta['begin_frame_id'], meta['end_frame_id'], self.video_fps)
+                cache_file = self.get_video_cache_file(meta['video_path'], meta['begin_frame_id'], meta['end_frame_id'], self.video_fps, pn)
             return osp.exists(cache_file)
     
     def form_batches(self, mapped_duration2metas):
         examples = []
         for mapped_duration in sorted(mapped_duration2metas.keys()):
             for example_ind in range(len(mapped_duration2metas[mapped_duration])):
-                examples.append((mapped_duration, example_ind))
-        self.epoch_rank_generator.shuffle(examples)
+                text_visual_tokens = mapped_duration2metas[mapped_duration][example_ind]['text_visual_tokens']
+                examples.append((mapped_duration, example_ind, text_visual_tokens))
+        examples = sorted(examples, key=lambda x: -x[2])
+        max_text_visual_tokens = examples[0][2] if len(examples) else 0
+        assert self.train_max_token_len >= max_text_visual_tokens, f'{self.train_max_token_len=} should >= {max_text_visual_tokens=}'
         self.print(f'{self.rank=} {self.mapped_duration2freqs=} form_batches details: {self.rank=} examples={examples[:20]}')
         
-        def custom_index(ptr):
-            mapped_duration, example_ind = examples[ptr]
-            return mapped_duration2metas[mapped_duration][example_ind]
-
         st = time.time()
         if self.feature_extraction or self.pair_input: # no sequence packing, for feature extraction or dpo training
-            batches = [[item] for item in examples]
+            batches = [[item[:2]] for item in examples]
         else:
             batches = []
-            tokens_remain = self.train_max_token_len
-            tmp_batch = []
-            for example_ptr in range(len(examples)):
-                tokens_remain = tokens_remain - custom_index(example_ptr)['text_visual_tokens']
-                tmp_batch.append(example_ptr)
-                if tokens_remain <= 0:
-                    batches.append([examples[ptr] for ptr in tmp_batch])
-                    tokens_remain = self.train_max_token_len
-                    tmp_batch = []
+            left_ptr, right_ptr = 0, len(examples)-1
+            while left_ptr <= right_ptr:
+                tokens_remain = self.train_max_token_len
+                tmp_batch = []
+                while left_ptr <= right_ptr and (tokens_remain - examples[left_ptr][2] >= 0):
+                    tokens_remain = tokens_remain - examples[left_ptr][2]
+                    tmp_batch.append((left_ptr, examples[left_ptr][2]))
+                    left_ptr += 1
+                while left_ptr <= right_ptr and (tokens_remain - examples[right_ptr][2] >= 0):
+                    tokens_remain = tokens_remain - examples[right_ptr][2]
+                    tmp_batch.append((right_ptr, examples[right_ptr][2]))
+                    right_ptr -= 1
+                if len(tmp_batch):
+                    tmp_batch = sorted(tmp_batch, key=lambda x: -x[1])
+                    # total_tokens = sum(item[1] for item in tmp_batch)
+                    # if total_tokens / self.train_max_token_len < 0.7:
+                    #     import pdb; pdb.set_trace()
+                    batches.append([examples[ptr][:2] for (ptr, _) in tmp_batch])
                     if len(batches) % 1000 == 0:
                         print(f'form {len(batches)} batches, len(metas)={len(examples)}')
         print(f'[data preprocess] form_batches done, got {len(batches)} batches, cost {time.time()-st:.2f}s')
@@ -480,7 +531,7 @@ class JointViDataset(Dataset):
             img_path, text_input = osp.abspath(info['image_path']), info['caption']
             img_T3HW, raw_features_cthw, feature_cache_file, text_features_lenxdim, text_feature_cache_file = [None] * 5
             if self.use_vae_token_cache:
-                feature_cache_file = self.get_image_cache_file(img_path)
+                feature_cache_file = self.get_image_cache_file(img_path, info['pn'])
                 if osp.exists(feature_cache_file):
                     try:
                         raw_features_cthw = self.load_visual_token(feature_cache_file)
@@ -495,7 +546,7 @@ class JointViDataset(Dataset):
                     w, h = img.size
                     h_div_w = h / w
                     h_div_w_template = self.h_div_w_templates[np.argmin(np.abs((h_div_w-self.h_div_w_templates)))]
-                    tgt_h, tgt_w = self.dynamic_resolution_h_w[h_div_w_template][self.pn]['pixel']
+                    tgt_h, tgt_w = self.dynamic_resolution_h_w[h_div_w_template][info['pn']]['pixel']
                     img = img.convert('RGB')
                     if self.c2i:
                         img_T3HW = self.c2i_transform(img)
@@ -542,7 +593,6 @@ class JointViDataset(Dataset):
             info["end_frame_id"],
         )
 
-        # if True:
         try:
             img_T3HW, raw_features_cthw, feature_cache_file, text_features_lenxdim, text_feature_cache_file = None, None, None, None, None
             img_T3HW_4additional_pn = {}
@@ -552,13 +602,11 @@ class JointViDataset(Dataset):
             sample_frames = info['sample_frames']
             tmp_local_path = ''
             if self.use_vae_token_cache:
-                feature_cache_file = self.get_video_cache_file(info["video_path"], begin_frame_id, end_frame_id, self.video_fps)
+                feature_cache_file = self.get_video_cache_file(info["video_path"], begin_frame_id, end_frame_id, self.video_fps, info['pn'])
                 if osp.exists(feature_cache_file):
                     try:
                         pt = (sample_frames-1) // self.temporal_compress_rate + 1
                         raw_features_cthw = self.load_visual_token(feature_cache_file)
-                        # _, tgt_h, tgt_w = self.dynamic_resolution_h_w[h_div_w_template][self.pn]['pt2scale_schedule'][1][-1]
-                        # assert raw_features_cthw.shape[-2:] == (tgt_h, tgt_w), f'raw_features_cthw.shape[-2:] == (tgt_h, tgt_w): {raw_features_cthw.shape[-2:]} vs {(tgt_h, tgt_w)}'
                         assert raw_features_cthw.shape[1] >= pt, f'raw_features_cthw.shape[1] >= pt: {raw_features_cthw.shape[1]} vs {pt}'
                         if raw_features_cthw.shape[1] > pt:
                             raw_features_cthw = raw_features_cthw[:,:pt]
@@ -568,39 +616,31 @@ class JointViDataset(Dataset):
                         raw_features_cthw = None
                 if raw_features_cthw is None and (not self.allow_online_vae_feature_extraction):
                     return False, None
-            pn_list = [self.pn]
+            pn_list = [info['pn']]
             if raw_features_cthw is None:
-                tmp_local_path = local_or_download(info, self.down_size_limit)
+                tmp_local_path = info["video_path"]
                 if not osp.exists(tmp_local_path):
                     return False, None
-                video = EncodedVideoOpencv(tmp_local_path, os.path.basename(tmp_local_path), num_threads=0) # bgr
-                # video = EncodedVideoDecord(tmp_local_path, os.path.basename(tmp_local_path), num_threads=0)
+                video = EncodedVideoDecord(tmp_local_path, os.path.basename(tmp_local_path), num_threads=0)
                 start_interval = max(0, begin_frame_id / video._fps)
                 end_interval = start_interval+(sample_frames-1)/self.video_fps
                 assert end_interval <= video.duration + 0.2, f'{end_interval=}, but {video.duration=}' # 0.2s margin
                 end_interval = min(end_interval, video.duration)
-                raw_video, _ = video.get_clip(start_interval, end_interval, sample_frames)
+                raw_video, _ = video.get_clip(start_interval, end_interval, sample_frames) # rgb order
                 h, w, _ = raw_video[0].shape
                 h_div_w = h / w
                 h_div_w_template = self.h_div_w_templates[np.argmin(np.abs((h_div_w-self.h_div_w_templates)))]
-                tgt_h, tgt_w = self.dynamic_resolution_h_w[h_div_w_template][self.pn]['pixel']
+                tgt_h, tgt_w = self.dynamic_resolution_h_w[h_div_w_template][info['pn']]['pixel']
                     
-                for addition_pn in self.addition_pn_list:
-                    pn_list = pn_list + [addition_pn]
                 for pn in pn_list:
-                    if isinstance(video, EncodedVideoDecord):
-                        img_T3HW = [transform(Image.fromarray(frame).convert("RGB"), tgt_h, tgt_w) for frame in raw_video]
-                    else:
-                        img_T3HW = [transform(Image.fromarray(frame[:,:,::-1]), tgt_h, tgt_w) for frame in raw_video] # bgr to rgb
+                    img_T3HW = [transform(Image.fromarray(frame).convert("RGB"), tgt_h, tgt_w) for frame in raw_video]
                     img_T3HW = torch.stack(img_T3HW, 0)
                     img_T3HW_4additional_pn[pn] = img_T3HW
                 del video
-                assert tmp_local_path.startswith('/dev/shm/tmp')
-                os.remove(tmp_local_path)
                 assert img_T3HW.shape[-3:] == (3, tgt_h, tgt_w)
             data_item = {
                 'text_input': text_input,
-                'img_T3HW': img_T3HW_4additional_pn.get(self.pn, None),
+                'img_T3HW': img_T3HW_4additional_pn.get(info['pn'], None),
                 'raw_features_cthw': raw_features_cthw,
                 'feature_cache_file': feature_cache_file,
                 'text_features_lenxdim': text_features_lenxdim,
@@ -611,8 +651,6 @@ class JointViDataset(Dataset):
                 data_item.update({f'img_T3HW_{pn}': img_T3HW_4additional_pn.get(pn, None)})
             return True, data_item
         except Exception as e:
-            if tmp_local_path and osp.exists(tmp_local_path):
-                os.remove(tmp_local_path)
             self.print(f'prepare_video_input error: {e}, info: {info}')
             return False, None
 
@@ -631,19 +669,19 @@ class JointViDataset(Dataset):
     def __len__(self):
         return len(self.batches) * self.other_args.loop_data_per_epoch
 
-    def get_image_cache_file(self, image_path):
+    def get_image_cache_file(self, image_path, pn):
         elems = image_path.split('/')
         elems = [item for item in elems if item]
         filename, ext = osp.splitext(elems[-1])
         filename = get_prompt_id(filename)
-        save_filepath = osp.join(self.token_cache_dir, f'images_pn_{self.pn}', '/'.join(elems[4:-1]), f'{filename}.npz')
+        save_filepath = osp.join(self.token_cache_dir, f'images_pn_{pn}', '/'.join(elems[4:-1]), f'{filename}.npz')
         return save_filepath
 
-    def get_video_cache_file(self, video_path, begin_frame_id, end_frame_id, video_fps):
+    def get_video_cache_file(self, video_path, begin_frame_id, end_frame_id, video_fps, pn):
         elems = video_path.split('/')
         elems = [item for item in elems if item]
         filename, ext = osp.splitext(elems[-1])
         filename = get_prompt_id(filename)
-        save_filepath = osp.join(self.token_cache_dir, f'pn_{self.pn}_sample_fps_{video_fps}', '/'.join(elems[4:-1]), f'{filename}_sf_{begin_frame_id}_ef_{end_frame_id}.npz')
+        save_filepath = osp.join(self.token_cache_dir, f'pn_{pn}_sample_fps_{video_fps}', '/'.join(elems[4:-1]), f'{filename}_sf_{begin_frame_id}_ef_{end_frame_id}.npz')
         return save_filepath
     

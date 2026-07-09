@@ -1,13 +1,31 @@
-# GRN: Generative Refinement Networks
+<!-- ---
+license: mit
+title: Generative Refinement Networks
+sdk: gradio
+emoji: 🚀
+colorFrom: red
+colorTo: yellow
+pinned: true
+short_description: "Generative Refinement Networks"
+---  -->
+# [ECCV 2026] GRN: Generative Refinement Networks
 
 [![arXiv](https://img.shields.io/badge/arXiv%20paper-2604.13030-b31b1b.svg)](https://arxiv.org/abs/2604.13030)
-[![Homepage](https://img.shields.io/badge/🏠%20Homepage-GRN-green.svg)](https://mgenai.github.io/GRN/)
+[![Homepage](https://img.shields.io/badge/🏠%20Homepage-GRN-green.svg)](https://bytedance.github.io/GRN/)
 [![Models](https://img.shields.io/badge/🤗%20Hugging%20Face-Models-blue.svg)](https://huggingface.co/bytedance-research/GRN)
 [![Demo](https://img.shields.io/badge/🤗%20Hugging%20Face-Demo-yellow.svg)](https://huggingface.co/spaces/hanjian/GRN)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/MGenAI/GRN?style=social)](https://github.com/MGenAI/GRN)
+[![GitHub stars](https://img.shields.io/github/stars/bytedance/GRN?style=social)](https://github.com/bytedance/GRN)
 
 ---
+
+## 🔥 Updates!!
+* June 26, 2026: 🏅 GRN 8B is out now! A unified single model covering T2V, I2V and T2I. Its performance rivals Wan 2.1 14B, AR models never surrender!
+* June 18, 2026: 🍾 GRN is accepted by ECCV 2026.
+* June 8, 2026: ✈️ The training & fine-tuning code for GRN-T2I and GRN-T2V is released.
+* June 3, 2026: 🍉 A toy image-video dataset is provided for GRN-T2I/GRN-T2V training and fine-tuning.
+* May 23, 2026: 🌺 We release the training and evaluation code for HBQ tokenizer, enjoy~
+* April 14, 2026: 🤗 Paper and code release
 
 ## 📋 Table of Contents
 
@@ -16,14 +34,26 @@
 - [🚀 Demo](#-demo)
 - [📦 Model Zoo](#-model-zoo)
 - [🛠️ Installation](#️-installation)
-- [🖼️ Class-to-Image](#️-class-to-image)
-  - [Dataset](#dataset)
+- [📦 HBQ Tokenizer](#-hbq-tokenizer)
+  - [Data](#data)
   - [Training](#training)
   - [Evaluation](#evaluation)
+- [🖼️ Class-to-Image](#️-class-to-image)
+  - [Data](#data-1)
+  - [Training](#training-2)
+  - [Evaluation](#evaluation-1)
 - [🎨 Text-to-Image](#-text-to-image)
+  - [Data](#data-2)
+  - [Training](#training-2)
   - [Inference](#inference)
 - [🎬 Text-to-Video](#-text-to-video)
+  - [Data](#data-3)
+  - [Training](#training-3)
   - [Inference](#inference-1)
+- [🎬 Image-to-Video](#-image-to-video)
+  - [Data](#data-4)
+  - [Training](#training-4)
+  - [Inference](#inference-2)
 - [📧 Contact](#-contact)
 - [🤗 Acknowledgements](#-acknowledgements)
 - [📝 Citation](#-citation)
@@ -47,7 +77,7 @@ GRN achieves state-of-the-art results on ImageNet reconstruction and class-condi
 
 <figure align="center">
   <figcaption><strong><em>Generative Refinement Framework</em></strong></figcaption>
-  <img src="demo/framework.jpg" width="100%" alt="Framework">
+  <img src="assets/framework.jpg" width="100%" alt="Framework">
 </figure>
 
 <p align="center">
@@ -107,13 +137,13 @@ Starting from a random token map, GRN randomly selects more predictions at each 
 ### GRN-2B Class-to-Image Examples
 <figure align="center">
   <!-- <figcaption><strong><em>GRN-2B Class-to-Image Examples</em></strong></figcaption> -->
-  <img src="demo/c2i_examples.jpg" width="100%" alt="Class-to-Image Examples">
+  <img src="assets/c2i_examples.jpg" width="100%" alt="Class-to-Image Examples">
 </figure>
 
 ### GRN-2B Text-to-Image Examples
 <figure align="center">
   <!-- <figcaption><strong><em>GRN-2B Text-to-Image Examples</em></strong></figcaption> -->
-  <img src="demo/t2i_examples.jpg" width="100%" alt="Text-to-Image Examples">
+  <img src="assets/t2i_examples.jpg" width="100%" alt="Text-to-Image Examples">
 </figure>
 
 ---
@@ -137,7 +167,7 @@ Try our interactive Text-to-Video demo on Discord:
 
 <figure align="center">
   <figcaption><strong><em>T2V Demo on Discord</em></strong></figcaption>
-  <img src="demo/t2v_demo.png" width="100%" alt="T2V Demo">
+  <img src="assets/t2v_demo.png" width="100%" alt="T2V Demo">
 </figure>
 
 ---
@@ -157,15 +187,16 @@ Try our interactive Text-to-Video demo on Discord:
 
 ### Step 1: Clone the repository
 ```bash
-git clone https://github.com/MGenAI/GRN
+git clone https://github.com/bytedance/GRN
 cd GRN
 ```
 
 ### Step 2: Create conda environment
 A suitable [conda](https://conda.io/) environment named `GRN` can be created and activated with:
 ```bash
-conda env create -f environment.yaml
+conda create -n GRN python=3.11
 conda activate GRN
+pip install -r requirements.txt
 ```
 
 ### Troubleshooting
@@ -178,9 +209,44 @@ Check this [issue](https://github.com/conda/conda/issues/13812#issuecomment-2071
 
 ---
 
+## 📦 HBQ Tokenizer
+
+### Data
+Image Dataset, e.g., data_root/username/labels/imagenet/train.txt:
+```
+[image_1_full_path]
+[image_2_full_path]
+[image_3_full_path]
+...
+```
+
+Video Dataset, e.g., data_root/username/labels_hanjian/high-quality-video/horizontal_videos.txt
+```
+[video_1_full_path]
+[video_2_full_path]
+[video_3_full_path]
+...
+```
+
+### Training
+For example, set `latent_channels=16/64` and `quant_method=hierarchical_binary_quant_round_4` in `scripts/hbq_tokenizer_train.sh`, then run:
+```bash
+cd grn/tokenizer
+bash scripts/hbq_tokenizer_train.sh
+```
+
+### Evaluation
+For example, set `latent_channels=16/64` and `quant_method=hierarchical_binary_quant_round_4` in `scripts/hbq_tokenizer_train.sh`, then run:
+```bash
+cd grn/tokenizer
+bash scripts/hbq_tokenizer_eval.sh
+```
+
+---
+
 ## 🖼️ Class-to-Image
 
-### Dataset
+### Data
 Download [ImageNet](http://image-net.org/download) dataset, and place it in your `IMAGENET_PATH`.
 
 ### Training
@@ -214,23 +280,37 @@ We use [torch-fidelity](https://github.com/LTH14/torch-fidelity) to evaluate FID
 ---
 
 ## 🎨 Text-to-Image
+### Data
+Refer to `data/toy_data/jsonls/000001/0001_0800_000000100.jsonl`
+```
+{"image_path": "[image_path_1]", "long_caption": "xxx", "long_caption_type": "caption-InternVL2.0", "text": "", "short_caption_type": "blip2_caption", "width": 1080, "height": 1920}
+{"image_path": "[image_path_2]", "long_caption": "xxx", "long_caption_type": "caption-InternVL2.0", "text": "", "short_caption_type": "blip2_caption", "width": 1080, "height": 1920}
+...
+```
+
+### Training
+Run `bash scripts/t2iv/train_GRN_bit_t2iv.sh`
 
 ### Inference
 
-You can simply run `python3 t2iv_infer_simple.py` or use the following code:
+You can simply run `python3 tools/t2i_infer.py` or use the following code:
 
 ```python
 from PIL import Image
-import torch
-from grn_pipeline import GRNPipeline
+from tools.grn_pipeline import GRNPipeline
 
 # Load pipeline
-pipeline = GRNPipeline.from_pretrained(hf_repo_id='bytedance-research/GRN', task='T2I',device='cpu')
-pipeline = pipeline.to('cuda')
+pipeline = GRNPipeline.from_pretrained(
+    hf_repo_id='bytedance-research/GRN',
+    task='T2I',
+    pn='1M', 
+    model='GRN2b',
+    device='cpu',
+).to('cuda')
 
 # Generate one image
 result = pipeline(
-    prompt="A cute cat playing in the garden",
+    prompt="<T2I>" + "A cute cat playing in the garden",
     guidance_scale=3.0,
     temperature=1.1,
     complexity_aware_Tmin=10,
@@ -239,10 +319,9 @@ result = pipeline(
     complexity_aware_b = 50,
     complexity_aware_wp = 5,
     snr_shift = 1.,
-    width=1024,
-    height=1024,
+    h_div_w=1.,
     content_type='image',
-    seed=42
+    seed=42,
 )
 image = result.images[0]
 image.save('./generated_image.jpg')
@@ -251,18 +330,33 @@ image.save('./generated_image.jpg')
 ---
 
 ## 🎬 Text-to-Video
+### Data
+Refer to `data/toy_data/jsonls/000001/0001_0800_000000100.jsonl`
+```
+{"video_path": "[video_path_1]", "begin_frame_id": xxx, "end_frame_id": xxx, "quality_prompt": "There is text in the video.", "fps": 25.0, "duration": 3.88, "width": 1280, "height": 720, "caption": [{"type": "short", "content": "[short_caption]"}, {"type": "medium", "content": "[medium_caption]"}, {"type": "long", "content": "[long_caption]"}]}
+{"video_path": "[video_path_1]", "begin_frame_id": xxx, "end_frame_id": xxx, "quality_prompt": "The quality is very high!", "fps": 25.0, "duration": 3.88, "width": 1280, "height": 720, "caption": [{"type": "short", "content": "[short_caption]"}, {"type": "medium", "content": "[medium_caption]"}, {"type": "long", "content": "[long_caption]"}]}
+...
+```
+
+### Training
+Run `bash scripts/t2iv/train_GRN_bit_t2iv.sh`
 
 ### Inference
 
+You can simply run `python3 tools/t2v_infer.py` or use the following code:
+
 ```python
-from PIL import Image
-import torch
-from grn_pipeline import GRNPipeline
+from tools.grn_pipeline import GRNPipeline
 
 # Load pipeline
-pipeline = GRNPipeline.from_pretrained(hf_repo_id='bytedance-research/GRN', task='T2V', device='cpu')
-pipeline = pipeline.to('cuda')
-  
+pipeline = GRNPipeline.from_pretrained(
+    hf_repo_id='bytedance-research/GRN',
+    task='T2V',
+    pn='0.41M', 
+    model='GRN2b', # 'GRN2b' or 'GRN8b'
+    device='cpu',
+).to('cuda')
+
 # Generate one video
 result = pipeline(
     prompt="Two women demonstrate a makeup product, applying it with a sponge while smiling and engaging with the camera in a bright, clean setting.",
@@ -274,11 +368,60 @@ result = pipeline(
     complexity_aware_b = 50,
     complexity_aware_wp = 5,
     snr_shift = 1.,
-    width=480,
-    height=848,
+    h_div_w=9/16,
     duration=2.,
     content_type='video',
-    seed=42
+    seed=42,
+)
+video_file = result.videos[0]
+```
+
+---
+## 🎭 Image-to-Video
+### Data
+Refer to `data/toy_data/jsonls/000001/0001_0800_000000100.jsonl`
+```
+{"video_path": "[video_path_1]", "begin_frame_id": xxx, "end_frame_id": xxx, "quality_prompt": "There is text in the video.", "fps": 25.0, "duration": 3.88, "width": 1280, "height": 720, "caption": [{"type": "short", "content": "[short_caption]"}, {"type": "medium", "content": "[medium_caption]"}, {"type": "long", "content": "[long_caption]"}]}
+{"video_path": "[video_path_1]", "begin_frame_id": xxx, "end_frame_id": xxx, "quality_prompt": "The quality is very high!", "fps": 25.0, "duration": 3.88, "width": 1280, "height": 720, "caption": [{"type": "short", "content": "[short_caption]"}, {"type": "medium", "content": "[medium_caption]"}, {"type": "long", "content": "[long_caption]"}]}
+...
+```
+
+### Training
+Run `bash scripts/t2iv/train_GRN_bit_t2iv.sh`
+
+### Inference
+
+You can simply run `python3 tools/i2v_infer.py` or use the following code:
+
+```python
+from tools.grn_pipeline import GRNPipeline
+
+# Load pipeline
+pipeline = GRNPipeline.from_pretrained(
+    hf_repo_id='bytedance-research/GRN',
+    task='T2V',
+    pn='0.41M', 
+    model='GRN8b',
+    device='cpu',
+).to('cuda')
+
+# Generate one video
+result = pipeline(
+    prompt="<I2V>视频展示了一辆红色敞篷跑车在城市道路中行驶的连续画面。车辆以中等速度前进，车身光滑，反射着黄昏的暖光，黑色轮毂与红色车漆形成对比。驾驶员为男性，专注地操控方向盘，姿态放松。道路两侧排列着高大的棕榈树，背景中可见石质围栏和模糊的建筑轮廓。随着视频推进，一辆白色SUV从后方快速驶过，产生动态模糊，突显跑车的稳定行驶。镜头保持相对固定的侧前方视角，轻微跟随车辆移动，捕捉车身线条与光影变化。整体画面色调温暖，光线柔和，营造出一种优雅而动感的都市驾驶氛围. high aesthetic and high quality video.",
+    guidance_scale=4.0,
+    temperature=1.0,
+    complexity_aware_Tmin=10,
+    complexity_aware_Tmax=50,
+    complexity_aware_k = 0,
+    complexity_aware_b = 50,
+    complexity_aware_wp = 5,
+    snr_shift = 1.,
+    h_div_w=9/16,
+    duration=2.,
+    content_type='video',
+    seed=42,
+    first_frame_condition=True,
+    first_frame_path='./assets/i2v_example.jpg',
 )
 video_file = result.videos[0]
 ```

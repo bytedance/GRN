@@ -155,7 +155,7 @@ class Trainer(object):
             kv_compact, lens, cu_seqlens_k, max_seqlen_k, caption_nums = text_cond_tuple
             
             with torch.no_grad():
-                x_BLC, x_BLC_mask, scale_or_time_ids, gt_BLC, _, visual_rope_cache, sequece_packing_scales, super_scale_lengths, super_querysid_super_refsid, other_info_by_scale, pad_seq_len = self.video_encode(
+                x_BLC, x_BLC_mask, scale_or_time_ids, gt_BLC, _, visual_rope_cache, sequece_packing_scales, super_scale_lengths, other_info_by_scale = self.video_encode(
                     vae=self.vae_local,
                     inp_B3HW=None,
                     vae_features=raw_features_list,
@@ -186,9 +186,7 @@ class Trainer(object):
                 visual_rope_cache=visual_rope_cache,
                 sequece_packing_scales=sequece_packing_scales,
                 super_scale_lengths=super_scale_lengths,
-                super_querysid_super_refsid=super_querysid_super_refsid,
                 other_info_by_scale=other_info_by_scale,
-                pad_seq_len=pad_seq_len,
                 scale_or_time_ids=scale_or_time_ids,
             ) # loss & acc_bit: [seq_len]
 
@@ -197,7 +195,7 @@ class Trainer(object):
             example_global_scales = 10
             acc_pt2scale_acc = {}
             acc_pt2scale_acc_counter = {}
-            for full_pt in self.dynamic_resolution_h_w[self.h_div_w_templates[0]][args.pn]['pt2scale_schedule']:
+            for full_pt in self.dynamic_resolution_h_w[self.h_div_w_templates[0]]['0.06M']['pt2scale_schedule']:
                 full_pt = int(np.round((full_pt-1) / 4)) * 4 + 1
                 if full_pt not in acc_pt2scale_acc:
                     acc_pt2scale_acc[full_pt] = [[] for _ in range(example_global_scales)]
@@ -218,7 +216,7 @@ class Trainer(object):
                     wandb_plot_index = other_info_by_scale[global_scale_ind]['wandb_plot_index']
                     acc_pt2scale_acc[full_pt][wandb_plot_index].append(acc_this_scale)
                     acc_pt2scale_acc_counter[full_pt][wandb_plot_index] += 1
-                    flatten_weight_list.append(1.)
+                    flatten_weight_list.append(mul_pt_ph_pw ** args.reweight_loss_by_scale)
                     flatten_L_list.append(loss_this_scale)
                     flatten_acc_bit_list.append(acc_this_scale)
                     global_scale_ind += 1

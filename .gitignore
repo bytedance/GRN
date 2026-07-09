@@ -24,3 +24,12 @@ tmp_videos
 weights
 .DS_Store
 local
+*.mp4
+tmp
+.git_bk
+demo
+.git_hf_space
+.git_github/
+*.pyc
+tmp
+*.png
