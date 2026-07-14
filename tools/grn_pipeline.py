@@ -48,7 +48,7 @@ class GRNPipeline:
             if task == 'T2I':
                 model_path = hf_hub_download(repo_id=hf_repo_id, filename="GRN_T2I_2B_FSA_251600.pth")
             elif task == 'T2V' and model == 'GRN2b':
-                model_path = hf_hub_download(repo_id=hf_repo_id, filename="GRN_T2V_2B_FSA_sft3800_non_ema.pth")
+                model_path = hf_hub_download(repo_id=hf_repo_id, filename="GRN_T2V_2B_FSA_sft147400_ema.pth")
             elif task == 'T2V' and model == 'GRN8b':
                 model_path = hf_hub_download(repo_id=hf_repo_id, filename="GRN_T2V_TITAN_FSA_sft10600_ema.pth")
             else:
