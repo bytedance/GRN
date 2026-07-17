@@ -147,6 +147,7 @@ def get_args_parser():
     parser.add_argument('--mask_group_size', default=-1, type=int)
     parser.add_argument('--grn_shift_factor', default=1., type=float)
     parser.add_argument('--use_focal_loss', default=0, type=int, choices=[0, 1])
+    parser.add_argument('--use_ema_params', default=1, type=int, choices=[0, 1, 2])
     return parser
 
 
@@ -254,11 +255,7 @@ def main(args):
         model = FSDP(
             model,
             auto_wrap_policy=auto_wrap_policy,
-            mixed_precision=MixedPrecision(
-                param_dtype=torch.bfloat16, 
-                reduce_dtype=torch.bfloat16, 
-                buffer_dtype=torch.bfloat16
-            ),
+            mixed_precision=None,
             device_id=torch.cuda.current_device(),
             sharding_strategy=sharding_strategy, 
             use_orig_params=True,

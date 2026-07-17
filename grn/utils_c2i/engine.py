@@ -62,7 +62,10 @@ def train_one_epoch(model, model_without_ddp, data_loader, optimizer, device, ep
 
         optimizer.zero_grad()
         loss.backward()
-        grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip_grad_norm)
+        if args.use_fsdp_train:
+            grad_norm = model.clip_grad_norm_(args.clip_grad_norm)
+        else:
+            grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip_grad_norm)
         optimizer.step()
 
         torch.cuda.synchronize()
@@ -107,10 +110,11 @@ def evaluate(model_without_ddp, args, epoch, batch_size=64, log_writer=None, vae
     save_folder = os.path.join(
         args.generation_dir,
         f'Epoch{epoch:04d}',
-        "{}-steps{}-cfg{}-tau{}-interval{}-{}-image{}-res{}-wp{}-k{}-b{}-Tmin{}".format(
+        "{}-steps{}-cfg{}-tau{}-interval{}-{}-image{}-res{}-wp{}-k{}-b{}-Tmin{}-ema{}".format(
             model_without_ddp.method, model_without_ddp.steps, model_without_ddp.cfg_scale, args.tau,
             model_without_ddp.cfg_interval[0], model_without_ddp.cfg_interval[1], args.num_images, args.img_size,
             args.complexity_aware_wp, args.complexity_aware_k, args.complexity_aware_b, args.complexity_aware_tmin,
+            args.use_ema_params,
         ),
         'images',
     )
@@ -121,10 +125,11 @@ def evaluate(model_without_ddp, args, epoch, batch_size=64, log_writer=None, vae
     json_file = os.path.join(
         os.path.dirname(os.environ.get('CKPT_FILE', '/tmp/res')),
         f'testing/Epoch{epoch:04d}/images_{args.num_images}',
-        "{}-steps{}-cfg{}-tau{}-interval{}-{}-image{}-res{}-wp{}-k{}-b{}-Tmin{}".format(
+        "{}-steps{}-cfg{}-tau{}-interval{}-{}-image{}-res{}-wp{}-k{}-b{}-Tmin{}-ema{}".format(
             model_without_ddp.method, model_without_ddp.steps, model_without_ddp.cfg_scale, args.tau,
             model_without_ddp.cfg_interval[0], model_without_ddp.cfg_interval[1], args.num_images, args.img_size,
             args.complexity_aware_wp, args.complexity_aware_k, args.complexity_aware_b, args.complexity_aware_tmin,
+            args.use_ema_params,
         ),
         'metrics.json',
     )
@@ -132,10 +137,19 @@ def evaluate(model_without_ddp, args, epoch, batch_size=64, log_writer=None, vae
     # switch to ema params, hard-coded to be the first one
     print("Switch to ema")
     model_params_backup = [p.detach().clone() for p in model_without_ddp.parameters()]
-    if hasattr(model_without_ddp, 'module') and hasattr(model_without_ddp.module, 'ema_params1'):
-         ema_params = model_without_ddp.module.ema_params1
-    else:
-         ema_params = model_without_ddp.ema_params1
+
+    if args.use_ema_params == 0:
+        pass
+    elif args.use_ema_params == 1:
+        if hasattr(model_without_ddp, 'module') and hasattr(model_without_ddp.module, 'ema_params1'):
+            ema_params = model_without_ddp.module.ema_params1
+        else:
+            ema_params = model_without_ddp.ema_params1
+    elif args.use_ema_params == 2:
+        if hasattr(model_without_ddp, 'module') and hasattr(model_without_ddp.module, 'ema_params2'):
+            ema_params = model_without_ddp.module.ema_params2
+        else:
+            ema_params = model_without_ddp.ema_params2 
 
     for param, ema_param in zip(model_without_ddp.parameters(), ema_params):
         param.data.copy_(ema_param.data)
