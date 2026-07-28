@@ -217,6 +217,8 @@ class JointViDataset(Dataset):
         else:
             valid_pn_list = pn_list
             valid_pn_probs = pn_probs
+        valid_pn_probs = np.array(valid_pn_probs)
+        valid_pn_probs = valid_pn_probs / valid_pn_probs.sum()
         return self.epoch_rank_generator.choice(valid_pn_list, p=valid_pn_probs)
 
     def get_mapped_duration2metas(self):
@@ -240,8 +242,10 @@ class JointViDataset(Dataset):
         total, corrupt = 0, 0
         stop_read = False
         rough_h_div_w = self.h_div_w_templates[np.argmin(np.abs((9/16-self.h_div_w_templates)))]
+        meta_folder2freqs = collections.defaultdict(int)
         for part_filepath in part_filepaths:
             file_quality_prompt = part_file2identifier[part_filepath]
+            meta_folder = osp.dirname(osp.dirname(part_filepath))
             if stop_read:
                 break
             pbar.update(1)
@@ -322,17 +326,24 @@ class JointViDataset(Dataset):
                 if self.other_args.cache_check_mode == 1: # check at the begining
                     if self.exists_cache_file(meta):
                         mapped_duration2metas[mapped_duration].append(meta)
+                        meta_folder2freqs[meta_folder] += 1
                 elif self.other_args.cache_check_mode == -1: # select unexist, used for token cache
                     if not self.exists_cache_file(meta):
                         mapped_duration2metas[mapped_duration].append(meta)
+                        meta_folder2freqs[meta_folder] += 1
                 else:
                     mapped_duration2metas[mapped_duration].append(meta)
+                    meta_folder2freqs[meta_folder] += 1
                 
                 total_metas = sum([len(item) for item in mapped_duration2metas.values()])
                 if (self.other_args.restrict_data_size > 0) and (total_metas > self.other_args.restrict_data_size / self.num_replicas):
                     stop_read = True
                     break
                 
+        # print meta folder2freqs
+        for meta_folder, freq in sorted(meta_folder2freqs.items(), key=lambda x: x[1], reverse=True):
+            print(f'{meta_folder=}, {freq=}, {freq / total_metas * 100:.1f}%')
+        
         # set mapped_duration2freqs
         mapped_duration2freqs = {}
         for mapped_duration in sorted(mapped_duration2metas.keys()):

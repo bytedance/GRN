@@ -781,3 +781,18 @@ def GRN8b(depth: int = 36, block_chunks: int = 6, embed_dim: int = 4096, num_hea
         drop_path_rate=drop_path_rate,
         **{k: v for k, v in kwargs.items() if k not in TIMM_KEYS}
     )
+
+@register_model
+def GRN8b(depth: int = 36, block_chunks: int = 6, embed_dim: int = 4096, num_heads: int = 32, num_key_value_heads: int = 32, mlp_ratio: float = 3, drop_path_rate: float = 0.0, **kwargs: Any) -> GRN: 
+    return GRN(
+        arch='qwen',
+        qwen_qkvo_bias=False,
+        depth=depth,
+        block_chunks=block_chunks,
+        embed_dim=embed_dim,
+        num_heads=num_heads,
+        num_key_value_heads=num_key_value_heads,
+        mlp_ratio=mlp_ratio,
+        drop_path_rate=drop_path_rate,
+        **{k: v for k, v in kwargs.items() if k not in TIMM_KEYS}
+    )
