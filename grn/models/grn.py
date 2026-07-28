@@ -714,7 +714,7 @@ class GRN(nn.Module):
     
     def special_init(self, **kwargs: Any) -> None:
         """Apply special initialization to specific layers."""
-        std = 0.02
+        std = math.sqrt(1 / self.C / 3)
         for name, module in self.named_modules():
             if isinstance(module, nn.Linear):
                 module.weight.data.normal_(mean=0.0, std=std)
@@ -724,6 +724,10 @@ class GRN(nn.Module):
                 module.weight.data.normal_(mean=0.0, std=std)
                 if module.padding_idx is not None:
                     module.weight.data[module.padding_idx].zero_()
+        residual_scale = 1 / math.sqrt(2 * self.depth)
+        for block in self.unregistered_blocks:
+            block.attn.o_proj.weight.data.mul_(residual_scale)
+            block.mlp.down_proj.weight.data.mul_(residual_scale)
     
     def extra_repr(self) -> str:
         return f'drop_path_rate={self.drop_path_rate}'
