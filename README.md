@@ -20,7 +20,7 @@ short_description: "Generative Refinement Networks"
 ---
 
 ## 🔥 Updates!!
-* June 26, 2026: 🏅 GRN 8B is out now! A unified single model covering T2V, I2V and T2I. Its performance rivals Wan 2.1 14B, AR models never surrender!
+* June 26, 2026: 🏅 GRN 8B is released now! A unified single model covering T2V, I2V and T2I. Its performance rivals Wan 2.1 14B, AR models never surrender!
 * June 18, 2026: 🍾 GRN is accepted by ECCV 2026.
 * June 8, 2026: ✈️ The training & fine-tuning code for GRN-T2I and GRN-T2V is released.
 * June 3, 2026: 🍉 A toy image-video dataset is provided for GRN-T2I/GRN-T2V training and fine-tuning.
@@ -177,7 +177,7 @@ Try our interactive Text-to-Video demo on Discord:
 | Model | Checkpoints |
 |-------|:-----------:|
 | **Tokenizers** | ✅ [ImageNet Tokenizer](https://huggingface.co/bytedance-research/GRN/blob/main/HBQ_image_tokenizer_16dim_M4.ckpt)<br>✅ [Joint Image/Video Tokenizer](https://huggingface.co/bytedance-research/GRN/blob/main/HBQ_tokenizer_64dim_M4.ckpt) |
-| **GRN_ind_C2I** | ✅ [B](https://huggingface.co/bytedance-research/GRN/blob/main/GRN_ind_B_ep599.pth)<br>⬜ L (TBD)<br>⬜ H (TBD)<br>⬜ G (TBD) |
+| **GRN_ind_C2I** | ✅ [B](https://huggingface.co/bytedance-research/GRN/blob/main/GRN_ind_B_ep599.pth)<br>[L](https://huggingface.co/bytedance-research/GRN/blob/main/GRN_ind_B_ep599.pth)<br>[H](https://huggingface.co/bytedance-research/GRN/blob/main/GRN_ind_B_ep599.pth)|
 | **GRN_bit_T2I** | ✅ [GRN_T2I](https://huggingface.co/bytedance-research/GRN/blob/main/GRN_T2I_2B.pth) |
 | **GRN_bit_T2V** | ✅ [GRN_T2V](https://huggingface.co/bytedance-research/GRN/blob/main/GRN_T2V_2B.pth) |
 
