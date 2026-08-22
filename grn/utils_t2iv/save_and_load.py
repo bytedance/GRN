@@ -119,11 +119,11 @@ def auto_resume(args: arg_util.Args, pattern='ckpt*.pth') -> Tuple[List[str], in
     print(f'auto resume from {resume}')
 
     try:
-        import os.path as osp
-        tgt_file = os.path.join(args.local_out_path, osp.basename(tgt_file))
+        tgt_file = os.path.join(args.local_out_path, osp.basename(resume))
         os.makedirs(osp.dirname(tgt_file), exist_ok=True)
-        print(f'[load model] copy {resume} to {tgt_file}')
-        shutil.copyfile(resume, tgt_file)
+        if osp.abspath(resume) != osp.abspath(tgt_file):
+            print(f'[load model] copy {resume} to {tgt_file}')
+            shutil.copyfile(resume, tgt_file)
         ckpt = torch.load(tgt_file, map_location='cpu')
     except Exception as e:
         info.append(f'[auto_resume] failed, {e} @ {resume}')
