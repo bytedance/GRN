@@ -18,4 +18,16 @@ $(document).ready(function() {
 	
     bulmaSlider.attach();
 
+    var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.querySelectorAll('video.gallery-video').forEach(function(video, index) {
+        video.setAttribute('aria-label', 'GRN gallery video ' + (index + 1));
+        if (!reduceMotion) {
+            video.autoplay = true;
+            var playback = video.play();
+            if (playback) {
+                playback.catch(function() {});
+            }
+        }
+    });
+
 })
