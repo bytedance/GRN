@@ -41,6 +41,8 @@ class GRNPipeline:
         model='GRN2b',
         use_slow_attn=False,
     ):
+        task = task.upper()
+
         # download weights from Hugging Face Hub
         if hf_repo_id:
             from huggingface_hub import hf_hub_download, snapshot_download
