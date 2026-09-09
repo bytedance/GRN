@@ -40,7 +40,7 @@ short_description: "Generative Refinement Networks"
   - [Evaluation](#evaluation)
 - [🖼️ Class-to-Image](#️-class-to-image)
   - [Data](#data-1)
-  - [Training](#training-2)
+  - [Training](#training-1)
   - [Evaluation](#evaluation-1)
 - [🎨 Text-to-Image](#-text-to-image)
   - [Data](#data-2)
