@@ -14,6 +14,7 @@ from grn.utils_t2iv.infer import (
 from grn.utils_t2iv.load import load_visual_tokenizer
 from grn.schedules.dynamic_resolution import get_dynamic_resolution_meta, get_first_full_spatial_size_scale_index
 from grn.schedules import get_encode_decode_func
+from tools.pipeline_result import PipelineResult
 
 
 class GRNPipeline:
@@ -232,10 +233,18 @@ class GRNPipeline:
         with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
             output_path = tmp.name
         
-        images2video(generated_image, fps=self.args.fps, save_filepath=output_path)
-        
-        if ext == '.jpg':
-            img = Image.open(output_path)
-            return type('Result', (object,), {'images': [img]})
-        else:
-            return type('Result', (object,), {'videos': [output_path]})
+        try:
+            images2video(generated_image, fps=self.args.fps, save_filepath=output_path)
+
+            if ext == '.jpg':
+                with Image.open(output_path) as img:
+                    image = img.copy()
+                os.unlink(output_path)
+                return PipelineResult(images=[image])
+            return PipelineResult(videos=[output_path], cleanup_paths=[output_path])
+        except Exception:
+            try:
+                os.unlink(output_path)
+            except FileNotFoundError:
+                pass
+            raise
