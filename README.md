@@ -432,7 +432,7 @@ video_file = result.videos[0]
 
 If you are interested in scaling GRN for image generation / image editing / video generation / video editing / unified model directions, please feel free to reach out!
 
-**📧 Email:** [hanjian.thu123@bytedance.com](mailto:hanjian.thu123@bytedance.com)
+**📧 Email:** [jianhan.thu@gmail.com](mailto:jianhan.thu@gmail.com)
 
 ---
 
