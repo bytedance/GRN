@@ -12,26 +12,56 @@ from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 import os.path as osp
 
-from grn.dataset.dataset_joint_vi import local_or_download
 from grn.utils.video_decoder import EncodedVideoDecord
 
+MODEL_ID = "Qwen/Qwen3-VL-32B-Instruct"
+
+# Set by load_model()/load_processor(); importing this module must stay cheap.
+model = None
+processor = None
 
 
-# --- 模型加载 (建议使用 try-except 保证健壮性) ---
-try:
-    model_id = "Qwen/Qwen3-VL-32B-Instruct"
-    # model_id = "/tmp/models--Qwen--Qwen3-VL-32B-Instruct/snapshots/0cfaf48183f594c314753d30a4c4974bc75f3ccb"
-    model = Qwen3VLForConditionalGeneration.from_pretrained(
-        model_id,
-        dtype=torch.bfloat16,
-        # attn_implementation="flash_attention_2",
-        device_map="auto",
-    )
-    processor = AutoProcessor.from_pretrained(model_id, padding_side='left')
-except Exception as e:
-    print(f"模型加载失败: {e}")
-    # 在实际生产环境中，可能需要更复杂的错误处理或退出逻辑
-    exit()
+def load_processor(model_id: str = MODEL_ID):
+    """Return the processor, loading it on first use.
+
+    DataLoader workers re-import this module, so the processor cannot be
+    assumed to be initialised by main() inside a worker.
+    """
+    global processor
+    if processor is None:
+        try:
+            processor = AutoProcessor.from_pretrained(model_id, padding_side='left')
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to load the captioning processor '{model_id}': {e}. "
+                "Install the model dependencies and make sure the processor is "
+                "available before running this tool."
+            ) from e
+    return processor
+
+
+def load_model(model_id: str = MODEL_ID):
+    """Load the captioning model and return it together with the processor.
+
+    Loading is explicit so that importing this module (e.g. to reuse
+    parse_combined_caption, or from a test) never pulls a 32B checkpoint.
+    Failures are reported to the caller instead of terminating the process.
+    """
+    global model
+    try:
+        model = Qwen3VLForConditionalGeneration.from_pretrained(
+            model_id,
+            dtype=torch.bfloat16,
+            # attn_implementation="flash_attention_2",
+            device_map="auto",
+        )
+    except Exception as e:
+        raise RuntimeError(
+            f"Failed to load the captioning model '{model_id}': {e}. "
+            "Install the model dependencies and make sure the checkpoint is "
+            "available before running this tool."
+        ) from e
+    return model, load_processor(model_id)
 
 FRAMES_PER_SECOND = 1
 CN_PROMPT = """
@@ -146,7 +176,8 @@ class VideoDataset(Dataset):
     def __getitem__(self, idx):
         meta = self.metas[idx]
         # video_path = meta['video_path']
-        video_path = local_or_download(meta, 500)
+        # same contract as JointViDataset.prepare_video_input: a local file
+        video_path = meta['video_path']
         if not osp.exists(video_path):
             return {'meta': meta, 'frames': None}
 
@@ -186,8 +217,6 @@ class VideoDataset(Dataset):
         except Exception as e:
             frames = None
             print(e)
-        if osp.exists(video_path):
-            os.remove(video_path)
         # frames = extract_frames(video_path, self.fps)
         if not frames:
             return {'meta': meta, 'frames': None}
@@ -211,7 +240,7 @@ def collate_fn(batch: List[Dict[str, Any]]):
         batch_inputs.append(messages)
 
     # 使用 processor 进行批处理
-    inputs = processor.apply_chat_template(
+    inputs = load_processor().apply_chat_template(
         batch_inputs,
         tokenize=True,
         add_generation_prompt=True,
@@ -232,6 +261,9 @@ def main():
     parser.add_argument('--batch_size', type=int, default=4)
     parser.add_argument('--num_workers', type=int, default=16)
     args = parser.parse_args()
+
+    # the captioning checkpoint is large: load it only from this command path
+    load_model()
 
     BATCH_SIZE = args.batch_size
     NUM_WORKERS = args.num_workers
