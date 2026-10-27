@@ -327,6 +327,10 @@ image = result.images[0]
 image.save('./generated_image.jpg')
 ```
 
+For the published 8B T2I checkpoint (`GRN_T2I_titan_FSA_256x256.pth`),
+set `model='GRN8b'` and `pn='0.06M'` when loading the pipeline
+(the square resolution is 256 × 256). The default 2B checkpoint is unchanged.
+
 ---
 
 ## 🎬 Text-to-Video
