@@ -421,7 +421,7 @@ result = pipeline(
     content_type='video',
     seed=42,
     first_frame_condition=True,
-    first_frame_path='./assets/i2v_example.jpg',
+    first_frame_path='./data/toy_data/media/images/000002.jpg',
 )
 video_file = result.videos[0]
 ```
