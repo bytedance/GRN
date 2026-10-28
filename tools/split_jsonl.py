@@ -14,7 +14,9 @@ import numpy as np
 def save_lines(lines, filename):
     os.makedirs(osp.dirname(filename), exist_ok=True)
     with open(filename, 'w') as f:
-        f.writelines(lines)
+        # A JSONL file's final record need not end with a newline. Restore
+        # separators before shuffled records from different files are joined.
+        f.writelines(line if line.endswith('\n') else line + '\n' for line in lines)
     del lines
 
 def get_part_jsonls(save_dir, total_line_number, ext='.jsonl', chunk_size=1000, bucket_size=1000):
@@ -80,8 +82,9 @@ def read_jsonls(jsonl_files, worker):
     print(f'[Data Loading] Reading {len(jsonl_files)} meta files...')
     all_lines = []
     if len(jsonl_files) == 1:
-        lines_num = int(osp.splitext(jsonl_files[0])[0].split('_')[-1])
-        pbar = tqdm.tqdm(total=lines_num)
+        # Input JSONL filenames need not encode their line count.
+        pbar.close()
+        pbar = tqdm.tqdm(unit='lines')
         with open(jsonl_files[0], 'r') as f:
             for line in f:
                 pbar.update(1)
