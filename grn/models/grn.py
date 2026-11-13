@@ -521,7 +521,6 @@ class GRN(nn.Module):
         
         from grn.schedules.global_refine import shift_pt
         
-        rng = None
         assert len(cfg_list) >= len(scale_schedule), "Not enough CFG values for scales"
         assert len(tau_list) >= len(scale_schedule), "Not enough tau values for scales"
 
@@ -545,6 +544,11 @@ class GRN(nn.Module):
         prefix_tokens, lens = self.prepare_text_conditions(label_B_or_BLT[0], negative_label_B_or_BLT, use_cfg)
         device = prefix_tokens.device
         infer_device, infer_dtype = prefix_tokens.device, prefix_tokens.dtype
+        rng = torch.Generator(device=infer_device)
+        if g_seed is None:
+            rng.seed()
+        else:
+            rng.manual_seed(int(g_seed))
         prefix_tokens = torch.split(prefix_tokens, lens, dim=0)
         rope_cache_text_cond = self.rope2d_freqs_grid['freqs_text'][:,:,:,:,:lens[0]]
         rope_cache_text_uncond = self.rope2d_freqs_grid['freqs_text'][:,:,:,:,:lens[1]]
@@ -578,7 +582,7 @@ class GRN(nn.Module):
         cu_seqlens = torch.tensor([0]+tmp_seqlens, device=device).cumsum(-1).to(torch.int32)
         max_seqlen = max(tmp_seqlens)
 
-        pure_rand_labels = torch.randint(low=0, high=classes, size=labels_shape, device=infer_device, dtype=infer_dtype)
+        pure_rand_labels = torch.randint(low=0, high=classes, size=labels_shape, device=infer_device, dtype=infer_dtype, generator=rng)
         mixed_xt = pure_rand_labels
         next_pt = 0.
         attn_mask = build_attn_mask(tmp_seqlens, device) if args.use_slow_attn else None
@@ -675,7 +679,7 @@ class GRN(nn.Module):
             
             pred_sample_labels = pred_sample_labels.permute(0,4,1,2,3) # [B,t,h,w,d] -> [B,d,t,h,w]
             pred_sample_probs = pred_sample_probs.permute(0,4,1,2,3) # [B,t,h,w,d] -> [B,d,t,h,w]
-            use_predict_mask = torch.rand(pred_sample_labels.shape, device=device) < next_pt
+            use_predict_mask = torch.rand(pred_sample_labels.shape, device=device, generator=rng) < next_pt
             mixed_xt = torch.where(use_predict_mask, pred_sample_labels, pure_rand_labels)
             next_pt = use_predict_mask.float().mean().item()
             pbar.update(1)
