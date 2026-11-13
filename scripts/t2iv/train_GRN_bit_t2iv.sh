@@ -95,6 +95,11 @@ video_fps=16
 video_frames=209
 i2v_ratio=0.
 
+resume_args=()
+if [[ -n "${RUSH_RESUME:-}" ]]; then
+    resume_args=(--rush_resume="${RUSH_RESUME}")
+fi
+
 rm -rf ${local_out_path}
 rm -rf ${bed_path}
 
@@ -211,4 +216,5 @@ t2iv_train.py \
 --dense_ratio4seqpack=0.4 \
 --enable_hybrid_shard=${enable_hybrid_shard} \
 --inner_shard_degree=${nproc_per_node} \
---rush_resume=[pretrained_GRN_model_path]
+"${resume_args[@]}" \
+"$@"
