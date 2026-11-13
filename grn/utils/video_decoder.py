@@ -18,15 +18,26 @@ if _HAS_DECORD:
 DecordDevice = TypeVar("DecordDevice")
 
 # https://github.com/dmlc/decord/issues/208#issuecomment-1157632702
-class VideoReaderWrapper(decord.VideoReader):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.seek(0)
+if _HAS_DECORD:
+    class VideoReaderWrapper(decord.VideoReader):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.seek(0)
 
-    def __getitem__(self, key):
-        frames = super().__getitem__(key)
-        self.seek(0)
-        return frames
+        def __getitem__(self, key):
+            frames = super().__getitem__(key)
+            self.seek(0)
+            return frames
+else:
+    class VideoReaderWrapper:
+        """Placeholder that keeps this optional decoder module importable."""
+
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "decord is required to use EncodedVideoDecord decoder. Please "
+                "install with 'pip install decord' for CPU-only version and refer to "
+                "'https://github.com/dmlc/decord' for GPU-supported version"
+            )
 
 
 class Video(ABC):
