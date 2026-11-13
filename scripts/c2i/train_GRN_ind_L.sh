@@ -1,4 +1,4 @@
-exp_name=GRN_ind_B
+exp_name=GRN_ind_L
 cache_dir=./checkpoints
 OUTPUT_DIR=${cache_dir}/${exp_name}
 
@@ -37,7 +37,7 @@ torchrun \
     --nnodes=$ARNOLD_WORKER_NUM --master_addr=$ARNOLD_WORKER_0_HOST \
     --node_rank=$ARNOLD_ID --master_port=$master_port \
     c2i_train_infer.py \
-    --model GRN_B \
+    --model GRN_L \
     --proj_dropout 0.0 \
     --P_mean -0.8 --P_std 0.8 \
     --img_size 256 --noise_scale 1.0 \
