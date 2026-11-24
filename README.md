@@ -71,6 +71,13 @@ We introduce **Generative Refinement Networks (GRN)**, a new visual synthesis pa
 - **Global refinement mechanism** that progressively perfects outputs like a human artist
 - **Entropy-guided sampling** for complexity-aware, adaptive-step generation
 
+**Released inference examples.** The paper describes entropy-guided adaptive
+step counts. The bundled `GRNPipeline` examples record entropy as a diagnostic;
+they do not use it to pick a step budget for each input. Refinement is capped by
+`max_infer_steps` and may stop early according to the sampling schedule. The
+`complexity_aware_Tmax` argument shapes that schedule, not an entropy-based
+step budget.
+
 GRN achieves state-of-the-art results on ImageNet reconstruction and class-conditional generation, and scales effectively to text-to-image and text-to-video tasks.
 
 ---
