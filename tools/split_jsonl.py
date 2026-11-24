@@ -2,7 +2,6 @@ import os
 import os.path as osp
 import time
 import itertools
-import shutil
 import glob
 import argparse
 import json
@@ -13,13 +12,11 @@ import numpy as np
 
 def save_lines(lines, filename):
     os.makedirs(osp.dirname(filename), exist_ok=True)
-    with open(filename, 'w') as f:
+    with open(filename, 'x') as f:
         f.writelines(lines)
     del lines
 
 def get_part_jsonls(save_dir, total_line_number, ext='.jsonl', chunk_size=1000, bucket_size=1000):
-    if osp.exists(save_dir):
-        shutil.rmtree(save_dir)
     chunk_id2save_files = {}
     missing = False
     parts = int(np.ceil(total_line_number / chunk_size))
@@ -96,11 +93,20 @@ def read_jsonls(jsonl_files, worker):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--jsonl_folder_list', type=str, default='', nargs='+', help='patha pathb pathc')
-    parser.add_argument('--save_dir', type=str, default='')
+    parser.add_argument('--save_dir', type=str, required=True,
+                        help='new or empty output directory (existing data is not overwritten)')
     parser.add_argument('--chunk_size', type=int, default=100)
     parser.add_argument('--bucket_size', type=int, default=10000)
     parser.add_argument('--worker', type=int, default=128)
     args = parser.parse_args()
+    if not args.save_dir:
+        parser.error('--save_dir must not be empty')
+    if osp.lexists(args.save_dir):
+        if not osp.isdir(args.save_dir):
+            parser.error('--save_dir must be a directory')
+        with os.scandir(args.save_dir) as entries:
+            if next(entries, None) is not None:
+                parser.error('--save_dir must be empty; choose a new directory to split again')
 
     global pbar
     t1 = time.time()
