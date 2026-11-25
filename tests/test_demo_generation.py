@@ -58,11 +58,12 @@ class DemoGenerationTest(unittest.IsolatedAsyncioTestCase):
             SimpleNamespace(images=[Image.new("RGB", (4, 4), "red")]),
             RuntimeError("synthetic inference detail"),
         ])
+        url = self.demo.config.get("api_prefix", "") + "/api/generate_and_display"
         with TestClient(self.demo.app) as client:
-            response = client.post("/api/generate_and_display", json={"data": self.args})
+            response = client.post(url, json={"data": self.args})
             self.assertEqual(response.status_code, 200)
             self.assertEqual(len(response.json()["data"][0]), 1)
-            response = client.post("/api/generate_and_display", json={"data": self.args})
+            response = client.post(url, json={"data": self.args})
         self.assertEqual(response.status_code, 500)
         body = response.json()
         self.assertIn("Could not generate the requested content.", body["error"])
