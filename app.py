@@ -38,7 +38,7 @@ def generate(prompt, content_type="image", guidance_scale=3.0, temperature=1.0, 
         except Exception as e:
             print(f"Error loading pipeline: {e}")
             traceback.print_exc()
-            return f"Error loading pipeline: {e}\n\n{traceback.format_exc()}"
+            raise gr.Error("Could not load the GRN model. Please try again.") from e
     
     try:
         result = pipe(
@@ -57,16 +57,16 @@ def generate(prompt, content_type="image", guidance_scale=3.0, temperature=1.0, 
             width=width,
             height=height
         )
-        
-        if content_type == "image" and hasattr(result, 'images'):
-            return result.images[0]
-        elif content_type == "video" and hasattr(result, 'videos'):
-            return result.videos[0]
-        return f"Error: Invalid result from pipeline"
     except Exception as e:
         print(f"Error generating content: {e}")
         traceback.print_exc()
-        return f"Error generating content: {e}\n\n{traceback.format_exc()}"
+        raise gr.Error("Could not generate the requested content. Please try again.") from e
+
+    field = {"image": "images", "video": "videos"}.get(content_type)
+    media = getattr(result, field, None) if field is not None else None
+    if media is None or len(media) == 0 or media[0] is None:
+        raise gr.Error("The GRN model did not produce any content.")
+    return media[0]
 
 def create_demo():
     with gr.Blocks(title="GRN: Generative Refinement Networks", theme=gr.themes.Soft()) as demo:
