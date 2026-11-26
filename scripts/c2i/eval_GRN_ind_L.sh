@@ -1,6 +1,6 @@
 cache_dir=./checkpoints
 batch_size=64
-exp_name=GRN_ind_B
+exp_name=GRN_ind_L
 CKPT_DIR=${cache_dir}/checkpoints/${exp_name}
 generation_dir=${cache_dir}/generation/${exp_name}
 CKPT_FILE='/weights/GRN_ind_L_ep599.pth'

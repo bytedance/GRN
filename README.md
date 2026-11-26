@@ -236,7 +236,7 @@ bash scripts/hbq_tokenizer_train.sh
 ```
 
 ### Evaluation
-For example, set `latent_channels=16/64` and `quant_method=hierarchical_binary_quant_round_4` in `scripts/hbq_tokenizer_train.sh`, then run:
+For example, set `latent_channels=16/64` and `quant_method=hierarchical_binary_quant_round_4` in `scripts/hbq_tokenizer_eval.sh`, then run:
 ```bash
 cd grn/tokenizer
 bash scripts/hbq_tokenizer_eval.sh
@@ -251,29 +251,23 @@ Download [ImageNet](http://image-net.org/download) dataset, and place it in your
 
 ### Training
 
-All training scripts are located in `scripts/c2i/`. We suggest using 8x80GB GPUs for most models.
+The training scripts shipped in `scripts/c2i/` are:
 
 | Model | Training Script | GPUs Required |
 |-------|:-------------:|:-------------:|
 | GRN_ind_B | `bash scripts/c2i/train_GRN_ind_B.sh` | 8x80GB |
-| GRN_bit_B | `bash scripts/c2i/train_GRN_bit_B.sh` | 8x80GB |
 | GRN_ind_L | `bash scripts/c2i/train_GRN_ind_L.sh` | 8x80GB |
-| GRN_ind_H | `bash scripts/c2i/train_GRN_ind_H.sh` | 16x80GB |
-| GRN_ind_G | `bash scripts/c2i/train_GRN_ind_G.sh` | 32x80GB |
 
 ### Evaluation
 
 PyTorch pre-trained models are available [here](https://huggingface.co/bytedance-research/GRN/tree/main).
 
-All evaluation scripts are located in `scripts/c2i/`. We suggest using 8x80GB vRAM GPUs.
+The evaluation scripts shipped in `scripts/c2i/` are listed below. We suggest using 8x80GB GPUs.
 
 | Model | Evaluation Script |
 |-------|:--------------:|
 | GRN_ind_B | `bash scripts/c2i/eval_GRN_ind_B.sh` |
-| GRN_bit_B | `bash scripts/c2i/eval_GRN_bit_B.sh` |
 | GRN_ind_L | `bash scripts/c2i/eval_GRN_ind_L.sh` |
-| GRN_ind_H | `bash scripts/c2i/eval_GRN_ind_H.sh` |
-| GRN_ind_G | `bash scripts/c2i/eval_GRN_ind_G.sh` |
 
 We use [torch-fidelity](https://github.com/LTH14/torch-fidelity) to evaluate FID and IS against a reference image folder or statistics. We use the JiT's pre-computed reference stats under `grn/utils_c2i/fid_stats`.
 
