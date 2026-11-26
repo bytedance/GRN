@@ -293,7 +293,7 @@ Run `bash scripts/t2iv/train_GRN_bit_t2iv.sh`
 
 ### Inference
 
-You can simply run `python3 tools/t2i_infer.py` or use the following code:
+From the repository root, run `python3 -m tools.t2i_infer` or use the following code:
 
 ```python
 from PIL import Image
@@ -343,7 +343,7 @@ Run `bash scripts/t2iv/train_GRN_bit_t2iv.sh`
 
 ### Inference
 
-You can simply run `python3 tools/t2v_infer.py` or use the following code:
+From the repository root, run `python3 -m tools.t2v_infer` or use the following code:
 
 ```python
 from tools.grn_pipeline import GRNPipeline
@@ -391,7 +391,7 @@ Run `bash scripts/t2iv/train_GRN_bit_t2iv.sh`
 
 ### Inference
 
-You can simply run `python3 tools/i2v_infer.py` or use the following code:
+From the repository root, run `python3 -m tools.i2v_infer --first-frame /path/to/first-frame.jpg` or use the following code. Replace the path with an existing input image and adjust the example prompt to match it:
 
 ```python
 from tools.grn_pipeline import GRNPipeline
@@ -421,7 +421,7 @@ result = pipeline(
     content_type='video',
     seed=42,
     first_frame_condition=True,
-    first_frame_path='./assets/i2v_example.jpg',
+    first_frame_path='/path/to/first-frame.jpg',
 )
 video_file = result.videos[0]
 ```
