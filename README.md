@@ -327,6 +327,12 @@ image = result.images[0]
 image.save('./generated_image.jpg')
 ```
 
+### GenEval
+
+The GRN 2B score of 0.76 in [Table 4](https://arxiv.org/html/2604.13030#S4.T4) uses rewritten prompts.
+The [maintainer's reproduction note](https://github.com/bytedance/GRN/issues/7#issuecomment-4910954762) links the [URSA GenEval prompts](https://github.com/baaivision/URSA/blob/main/evaluations/geneval/prompts.json), where `dense_prompt` contains the rewrite and `prompt` the original text.
+Report which input you used when comparing GenEval scores.
+
 ---
 
 ## 🎬 Text-to-Video
